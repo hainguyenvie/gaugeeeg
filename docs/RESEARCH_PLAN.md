@@ -1,0 +1,119 @@
+# Research plan
+
+## 1. Starting point
+
+NAI-SSL argues that a self-supervised objective can be stronger when its
+supervision is derived from a scientific property of the data rather than
+copied from natural-image learning. Its specific rule is inter-hemispheric
+structural covariance in MRI. GaugeEEG keeps the design principle but changes
+the modality, rule, benchmark, and anchor baseline.
+
+The high-tier anchor is REVE (NeurIPS 2025), not NAI-SSL. REVE is a strong and
+appropriate target because it explicitly addresses heterogeneous electrode
+layouts, provides code and pretrained weights, and reports results on
+PhysioNetMI. This lets us ask a narrower question that its spatial positional
+encoding does not explicitly encode: is the representation invariant to the
+voltage reference convention?
+
+## 2. Scientific rule
+
+Scalp voltage has no physically meaningful absolute zero. If an EEG sample is
+represented by `X` with `C` channels, then
+
+```text
+X' = X + 1 a(t)
+```
+
+describes the same pairwise voltage field for any common time-varying signal
+`a(t)`. A linear reference with weights `w`, where `w^T 1 = 1`, is
+
+```text
+R_w(X) = X - 1 (w^T X).
+```
+
+Pairwise channel differences are invariant to this transformation. Common
+average referencing is a canonical projection onto the subspace orthogonal to
+the all-ones channel vector.
+
+This is a *gauge symmetry*: multiple numerical arrays represent the same
+underlying measurable voltage differences.
+
+## 3. Candidate limitation
+
+REVE's 4D positional encoding models where an electrode is and when a patch
+occurs. The released PhysioNetMI preprocessing fixes average reference before
+training/evaluation. The architecture and MAE loss do not explicitly identify
+signals that differ only by a reference operator as equivalent.
+
+Therefore, arbitrary-layout support does not automatically imply
+reference-convention invariance. This is a testable limitation, not an assumed
+fact; Experiment E2 is designed to falsify it.
+
+## 4. Research gap
+
+The proposed gap is a controlled evaluation and learning framework for EEG
+foundation-model robustness to valid reference transformations while holding
+the subject, task, electrode locations, and underlying recording fixed.
+
+The defensible claim at pilot stage is:
+
+> Existing EEG representation benchmarks mainly vary subjects, datasets, and
+> electrode layouts, but do not isolate reference convention as a structured
+> nuisance variable in frozen-representation transfer.
+
+A final paper must repeat a systematic literature search before claiming that
+no prior study has addressed this problem.
+
+## 5. Contribution ladder
+
+1. **RefShift-EEG benchmark.** Paired, label-preserving reference views with
+   task performance and representation-drift metrics.
+2. **Exact sanity baseline.** CAR canonicalization proves the benchmark is
+   measuring the intended additive gauge component.
+3. **Gauge-aware representation learning.** Train an adapter or continue
+   pretraining with paired valid references and a consistency objective.
+4. **Beyond ideal common-mode shifts.** Extend to bipolar derivations,
+   missing-channel montages, and cross-dataset transfer, where exact CAR
+   canonicalization alone is insufficient.
+
+Only item 1 and the exact baseline are implemented in v0.1. The learned method
+should be added only if the pilot establishes a meaningful failure mode.
+
+## 6. Core hypotheses
+
+- **H1:** Frozen REVE embeddings and linear-probe performance change under
+  valid single-electrode or linear re-referencing.
+- **H2:** Exact CAR canonicalization removes the simple reference component and
+  recovers the clean-view representation, validating the benchmark.
+- **H3:** Under harder convention changes where exact canonicalization is
+  unavailable, gauge-consistency learning improves worst-reference performance
+  without reducing clean-reference performance.
+
+## 7. Go/no-go criteria
+
+Proceed to a learned method if, across repeated seeds and the full subject
+split:
+
+- at least one valid reference produces a >=3 percentage-point balanced
+  accuracy drop in the unprotected frozen model;
+- the direction of the drop is stable across seeds;
+- embedding drift is nontrivial (for example, mean paired cosine <0.95 or a
+  clear CKA reduction); and
+- CAR canonicalization recovers at least 80% of the simple-reference gap.
+
+Pivot to bipolar/missing-channel transfer if all simple-reference drops are
+<1 point and paired cosine is >0.98. Stop this direction if the harder shifts
+also produce no meaningful drift or downstream loss.
+
+## 8. Threats to validity
+
+- PhysioNetMI is one task and one acquisition family; a paper needs at least one
+  additional open dataset.
+- REVE weights require acceptance of a responsible-use agreement, so the
+  bandpower experiment is the fully ungated smoke test.
+- A single reference channel may contain sensor noise; report both deterministic
+  named references and a distributed linear reference.
+- CAR is an exact solution only when all channels are retained and reference
+  changes are purely common-mode.
+- Results from the 12-subject pilot are for debugging and effect-size screening,
+  not paper claims.

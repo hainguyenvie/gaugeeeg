@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+
+# Downloaded data, model caches, and generated results
+data/*
+!data/.gitkeep
+outputs/*
+!outputs/.gitkeep
+.cache/
+wandb/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/

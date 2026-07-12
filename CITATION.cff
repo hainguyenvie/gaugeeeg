@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite this repository and the upstream REVE and PhysioNet papers."
+title: "GaugeEEG: Reference-shift robustness for EEG representation learning"
+type: software
+version: 0.1.0
+date-released: 2026-07-12
+authors:
+  - name: "GaugeEEG contributors"
+license: MIT
+repository-code: "https://github.com/hainguyenvie/gaugeeeg"
