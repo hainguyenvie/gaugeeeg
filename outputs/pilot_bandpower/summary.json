@@ -1,0 +1,10 @@
+{
+  "encoder": "bandpower",
+  "seed": 7,
+  "n_trials": 1080,
+  "n_channels": 64,
+  "sfreq": 200.0,
+  "largest_balanced_accuracy_gap": 0.017539525691699587,
+  "lowest_paired_cosine": -0.07505283728059219,
+  "metrics_path": "outputs/pilot_bandpower/metrics.csv"
+}

@@ -1,0 +1,10 @@
+{
+  "encoder": "reve",
+  "seed": 7,
+  "n_trials": 1080,
+  "n_channels": 64,
+  "sfreq": 200.0,
+  "largest_balanced_accuracy_gap": 0.0,
+  "lowest_paired_cosine": 0.9861180260934544,
+  "metrics_path": "outputs/pilot_reve/metrics.csv"
+}
