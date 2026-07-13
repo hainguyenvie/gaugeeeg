@@ -1,0 +1,13 @@
+{
+  "encoder": "reve",
+  "seed": 7,
+  "n_trials": 9837,
+  "n_channels": 64,
+  "sfreq": 200.0,
+  "largest_balanced_accuracy_gap": 0.0,
+  "lowest_paired_cosine": 1.0,
+  "clean_car_balanced_accuracy": 0.5566929874936001,
+  "clean_gate_min_balanced_accuracy": 0.45,
+  "clean_gate_passed": true,
+  "metrics_path": "outputs/reve_clean_gate/metrics.csv"
+}

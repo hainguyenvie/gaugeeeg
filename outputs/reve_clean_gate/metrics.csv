@@ -1,0 +1,2 @@
+seed,encoder,defense,train_view,test_view,n_train,n_val,n_test,probe,selected_c,selected_epoch,validation_balanced_accuracy,accuracy,balanced_accuracy,macro_f1,macro_auroc_ovr,paired_cosine_to_car,relative_l2_to_car,linear_cka_to_car,balanced_accuracy_gap_from_car
+7,reve,none,car,car,6300,1734,1803,reve_token,,9,0.5132121725732843,0.5562950637825845,0.5566929874936001,0.5521427667544165,0.8249133892019611,1.0,0.0,1.0,0.0
