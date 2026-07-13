@@ -32,6 +32,8 @@ class TorchProbeTests(unittest.TestCase):
             patience=8,
         )
         self.assertGreaterEqual(result.validation_balanced_accuracy, 0.9)
+        self.assertGreaterEqual(len(result.history), 1)
+        self.assertIn("learning_rate", result.history[0])
 
 
 if __name__ == "__main__":

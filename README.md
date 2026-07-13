@@ -108,21 +108,25 @@ reference shifts until this gate passes.
 
 ## Full reference benchmark
 
-After the clean gate passes, the existing full configuration can still be used
-for the lightweight attention-pooled ablation. A token-probe stress config will
-be enabled after the clean run establishes which released LP variant is
-reproducible on the local environment.
+The clean gate has passed on the full split (test balanced accuracy 0.5567).
+Run the first reference-stress screening with the same token-level probe:
 
 ```bash
 gaugeeeg run \
-  --config configs/full_physionetmi.yaml \
-  --encoder reve \
-  --device cuda \
-  --output-dir outputs/full_reve
+  --config configs/reve_reference_stress.yaml \
+  --device cuda
 ```
 
-The full experiment downloads six motor-imagery runs for all 109 subjects and
-can require several GB of disk and substantial feature-extraction time.
+This evaluates CAR, Cz, Pz, FCz, and a deterministic random linear reference
+with one probe trained only on CAR. It reuses the clean-gate train, validation,
+and CAR-test token cache, so only the shifted test views require new REVE
+inference. Do not use `--force-recompute`, because that bypasses cache reuse.
+
+The screening hypothesis is supported when `stress_effect_detected` is true,
+corresponding to at least a 0.03 absolute balanced-accuracy drop for one valid
+reference. The run also saves `probe_history_none.csv` and a local best-probe
+checkpoint. If the screen is positive, the next stage repeats the experiment
+with seeds 7, 21, and 42.
 
 ## Reading the output
 
@@ -149,6 +153,8 @@ electrodes, and cross-dataset montage transfer.
 See [docs/RESEARCH_PLAN.md](docs/RESEARCH_PLAN.md) for the hypothesis,
 research gap, contribution ladder, and falsification criteria. See
 [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) for the exact experiment sequence.
+See [conversation.md](conversation.md) for the chronological evidence and
+decisions from each research iteration.
 
 ## Reproducibility notes
 

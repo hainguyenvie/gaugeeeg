@@ -13,6 +13,7 @@ class TorchProbeResult:
     model: TorchTokenPredictor
     selected_epoch: int
     validation_balanced_accuracy: float
+    history: tuple[dict[str, float], ...]
 
 
 class TorchTokenPredictor:
@@ -137,6 +138,7 @@ def fit_reve_token_probe(
     best_epoch = 0
     best_state = None
     stale_epochs = 0
+    history: list[dict[str, float]] = []
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -160,7 +162,16 @@ def fit_reve_token_probe(
         score = float(balanced_accuracy_score(val_y, prediction))
         if epoch > warmup_epochs:
             scheduler.step(score)
-        print(f"LP epoch {epoch:02d}/{epochs} | loss={total_loss / train_y.size:.4f} | val_bacc={score:.4f}")
+        epoch_loss = total_loss / train_y.size
+        history.append(
+            {
+                "epoch": float(epoch),
+                "train_loss": float(epoch_loss),
+                "validation_balanced_accuracy": score,
+                "learning_rate": float(optimizer.param_groups[0]["lr"]),
+            }
+        )
+        print(f"LP epoch {epoch:02d}/{epochs} | loss={epoch_loss:.4f} | val_bacc={score:.4f}")
         if score > best_score:
             best_score = score
             best_epoch = epoch
@@ -175,4 +186,4 @@ def fit_reve_token_probe(
     if best_state is None:
         raise RuntimeError("REVE token probe did not produce a checkpoint")
     model.load_state_dict(best_state)
-    return TorchProbeResult(predictor, best_epoch, best_score)
+    return TorchProbeResult(predictor, best_epoch, best_score, tuple(history))

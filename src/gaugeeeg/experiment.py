@@ -110,7 +110,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     force_recompute = bool(experiment.get("force_recompute", False))
     dataset = load_physionet_mi(data_config, force_recompute=force_recompute)
     encoder = build_encoder(experiment)
-    feature_cache = output_dir / "feature_cache"
+    feature_cache = Path(experiment.get("feature_cache_dir", output_dir / "feature_cache"))
 
     splits = {
         "train": [int(v) for v in data_config["train_subjects"]],
@@ -191,6 +191,23 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             predictor = probe.model
             selected_epoch = probe.selected_epoch
             validation_score = probe.validation_balanced_accuracy
+            pd.DataFrame(probe.history).to_csv(output_dir / f"probe_history_{defense}.csv", index=False)
+
+            try:
+                import torch
+
+                torch.save(
+                    {
+                        "model_state_dict": predictor.module.state_dict(),
+                        "selected_epoch": selected_epoch,
+                        "validation_balanced_accuracy": validation_score,
+                        "probe": probe_name,
+                        "seed": seed,
+                    },
+                    output_dir / f"probe_best_{defense}.pt",
+                )
+            except ImportError:
+                pass
         else:
             raise ValueError(f"Unknown probe: {probe_name}")
 
@@ -257,6 +274,17 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         ].iloc[0]
     )
     gate_threshold = float(experiment.get("clean_gate_min_balanced_accuracy", 0.0))
+    non_car = results[results["test_view"].str.lower() != "car"]
+    if non_car.empty:
+        largest_drop = 0.0
+        largest_absolute_change = 0.0
+        worst_view = None
+    else:
+        worst_index = non_car["balanced_accuracy_gap_from_car"].idxmax()
+        largest_drop = float(non_car.loc[worst_index, "balanced_accuracy_gap_from_car"])
+        largest_absolute_change = float(non_car["balanced_accuracy_gap_from_car"].abs().max())
+        worst_view = str(non_car.loc[worst_index, "test_view"])
+    stress_threshold = float(experiment.get("stress_effect_min_balanced_accuracy_drop", 0.03))
     summary = {
         "encoder": encoder.name,
         "seed": seed,
@@ -268,6 +296,12 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "clean_car_balanced_accuracy": clean_bacc,
         "clean_gate_min_balanced_accuracy": gate_threshold,
         "clean_gate_passed": bool(clean_bacc >= gate_threshold),
+        "worst_reference_view": worst_view,
+        "largest_balanced_accuracy_drop": largest_drop,
+        "largest_absolute_balanced_accuracy_change": largest_absolute_change,
+        "stress_effect_min_balanced_accuracy_drop": stress_threshold,
+        "stress_effect_detected": bool(largest_drop >= stress_threshold),
+        "feature_cache_dir": str(feature_cache),
         "metrics_path": str(output_dir / "metrics.csv"),
     }
     with (output_dir / "summary.json").open("w", encoding="utf-8") as handle:
