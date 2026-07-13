@@ -67,17 +67,84 @@ def classification_metrics(
     y: NDArray[np.integer],
 ) -> dict[str, float]:
     prediction = model.predict(x)
+    try:
+        probability = model.predict_proba(x)
+    except (AttributeError, ValueError):
+        probability = None
+    return classification_metrics_from_predictions(y, prediction, probability)
+
+
+def classification_metrics_from_predictions(
+    y: NDArray[np.integer],
+    prediction: NDArray[np.integer],
+    probability: NDArray[np.floating] | None = None,
+) -> dict[str, float]:
+    """Calculate task metrics from cached predictions and probabilities."""
+
     result = {
         "accuracy": float(accuracy_score(y, prediction)),
         "balanced_accuracy": float(balanced_accuracy_score(y, prediction)),
         "macro_f1": float(f1_score(y, prediction, average="macro", zero_division=0)),
     }
     try:
-        probability = model.predict_proba(x)
+        if probability is None:
+            raise ValueError
         result["macro_auroc_ovr"] = float(roc_auc_score(y, probability, multi_class="ovr", average="macro"))
     except ValueError:
         result["macro_auroc_ovr"] = float("nan")
     return result
+
+
+def paired_subject_bootstrap_bacc_gap(
+    y_true: NDArray[np.integer],
+    car_prediction: NDArray[np.integer],
+    shifted_prediction: NDArray[np.integer],
+    subjects: NDArray[np.integer],
+    *,
+    n_resamples: int = 10_000,
+    confidence: float = 0.95,
+    seed: int = 7,
+) -> dict[str, float | int]:
+    """Paired cluster bootstrap of BAcc(CAR) - BAcc(shifted).
+
+    Subjects, rather than individual trials, are sampled with replacement so
+    repeated trials from one person are never treated as independent units.
+    """
+
+    inputs = (y_true, car_prediction, shifted_prediction, subjects)
+    arrays = [np.asarray(value).reshape(-1) for value in inputs]
+    sizes = {array.size for array in arrays}
+    if len(sizes) != 1 or not sizes or next(iter(sizes)) == 0:
+        raise ValueError("Bootstrap inputs must be non-empty one-dimensional arrays of equal length")
+    if n_resamples < 1:
+        raise ValueError("n_resamples must be at least 1")
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must be in (0, 1)")
+
+    y_array, car_array, shifted_array, subject_array = arrays
+    unique_subjects = np.unique(subject_array)
+    subject_indices = {subject: np.flatnonzero(subject_array == subject) for subject in unique_subjects}
+    rng = np.random.default_rng(seed)
+    gaps = np.empty(n_resamples, dtype=np.float64)
+    for index in range(n_resamples):
+        sampled_subjects = rng.choice(unique_subjects, size=unique_subjects.size, replace=True)
+        sampled_indices = np.concatenate([subject_indices[subject] for subject in sampled_subjects])
+        gaps[index] = balanced_accuracy_score(y_array[sampled_indices], car_array[sampled_indices]) - (
+            balanced_accuracy_score(y_array[sampled_indices], shifted_array[sampled_indices])
+        )
+
+    alpha = (1.0 - confidence) / 2.0
+    point_gap = balanced_accuracy_score(y_array, car_array) - balanced_accuracy_score(y_array, shifted_array)
+    return {
+        "n_subjects": int(unique_subjects.size),
+        "n_resamples": int(n_resamples),
+        "confidence": float(confidence),
+        "point_gap": float(point_gap),
+        "bootstrap_mean_gap": float(gaps.mean()),
+        "ci_lower": float(np.quantile(gaps, alpha)),
+        "ci_upper": float(np.quantile(gaps, 1.0 - alpha)),
+        "probability_gap_positive": float(np.mean(gaps > 0.0)),
+    }
 
 
 def paired_cosine(x: NDArray[np.floating], y: NDArray[np.floating], eps: float = 1e-12) -> float:

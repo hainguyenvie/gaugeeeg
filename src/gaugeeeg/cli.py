@@ -22,6 +22,8 @@ def _run_command(args: argparse.Namespace) -> None:
         device=args.device,
         output_dir=args.output_dir,
         force_recompute=True if args.force_recompute else None,
+        probe_seed=args.probe_seed,
+        reference_seed=args.reference_seed,
     )
     run_experiment(config)
 
@@ -76,6 +78,13 @@ def _summarize_command(args: argparse.Namespace) -> None:
     print(frame[columns].to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _aggregate_command(args: argparse.Namespace) -> None:
+    from .audit import aggregate_audit_runs
+
+    result = aggregate_audit_runs(args.runs, args.output_dir)
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -86,6 +95,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--device", help="auto, cpu, cuda, or a torch device such as cuda:1")
     run.add_argument("--output-dir")
     run.add_argument("--force-recompute", action="store_true")
+    run.add_argument("--probe-seed", type=int, help="Probe initialization/data-order seed")
+    run.add_argument("--reference-seed", type=int, help="Fixed seed for stochastic reference views")
     run.set_defaults(handler=_run_command)
 
     download = subparsers.add_parser("download", help="Download and cache the configured dataset")
@@ -100,6 +111,11 @@ def build_parser() -> argparse.ArgumentParser:
     summarize = subparsers.add_parser("summarize", help="Print the key columns from a metrics CSV")
     summarize.add_argument("--metrics", required=True)
     summarize.set_defaults(handler=_summarize_command)
+
+    aggregate = subparsers.add_parser("aggregate-audit", help="Aggregate repeated probe-seed audits")
+    aggregate.add_argument("--runs", nargs="+", required=True, help="Audit output directories")
+    aggregate.add_argument("--output-dir", default="outputs/reve_statistical_audit_multiseed")
+    aggregate.set_defaults(handler=_aggregate_command)
     return parser
 
 

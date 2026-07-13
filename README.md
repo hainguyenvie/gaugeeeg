@@ -128,6 +128,40 @@ reference. The run also saves `probe_history_none.csv` and a local best-probe
 checkpoint. If the screen is positive, the next stage repeats the experiment
 with seeds 7, 21, and 42.
 
+## Statistical audit after the 3-seed screen
+
+The first three-seed screen found a marginal effect: Cz reduced balanced
+accuracy by about 3.2 points on average, while the worst view and threshold
+decision changed across probe seeds. Run the subject-level audit before making
+a downstream-robustness claim:
+
+```bash
+gaugeeeg run --config configs/reve_statistical_audit.yaml \
+  --probe-seed 7 --output-dir outputs/reve_statistical_audit_s7
+
+# Re-run seed 7 once to check strict reproducibility.
+gaugeeeg run --config configs/reve_statistical_audit.yaml \
+  --probe-seed 7 --output-dir outputs/reve_statistical_audit_s7_repeat
+
+gaugeeeg run --config configs/reve_statistical_audit.yaml \
+  --probe-seed 21 --output-dir outputs/reve_statistical_audit_s21
+
+gaugeeeg run --config configs/reve_statistical_audit.yaml \
+  --probe-seed 42 --output-dir outputs/reve_statistical_audit_s42
+
+gaugeeeg aggregate-audit \
+  --runs outputs/reve_statistical_audit_s7 \
+         outputs/reve_statistical_audit_s21 \
+         outputs/reve_statistical_audit_s42
+```
+
+All runs fix `reference_seed=7`, reuse the existing seed-7 token cache, and
+change only probe initialization/data order. Do not pass `--force-recompute`.
+The audit saves trial predictions, per-subject metrics, and a paired
+subject-cluster bootstrap confidence interval. Aggregation uses sample standard
+deviation (`ddof=1`) and selects one fixed worst reference across seeds instead
+of averaging a separately selected maximum from each seed.
+
 ## Reading the output
 
 Each run creates:
@@ -136,6 +170,10 @@ Each run creates:
 - `summary.json`: compact best/worst gaps and run metadata.
 - `resolved_config.yaml`: the exact configuration used.
 - `feature_cache/`: reusable frozen features for interrupted or repeated runs.
+- `predictions.csv`: aligned trial predictions and class probabilities when
+  enabled by the statistical-audit config.
+- `subject_metrics.csv`: one row per test subject and reference view.
+- `paired_subject_bootstrap.csv`: paired subject-cluster bootstrap intervals.
 
 The primary stress-test quantity is:
 

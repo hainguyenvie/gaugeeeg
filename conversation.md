@@ -90,3 +90,34 @@ the working hypothesis or paper direction.
 - `outputs/reve_reference_stress/probe_history_none.csv`
 - `outputs/reve_reference_stress/probe_best_none.pt` (local artifact; ignored by
   Git unless explicitly selected)
+
+## 2026-07-13 — Three-seed reference-stress result
+
+- Repeated the CAR-trained token probe with probe seeds 7, 21, and 42.
+- Mean clean CAR balanced accuracy was 0.5788.
+- Cz was the most consistent fixed stress view: balanced-accuracy gap
+  0.0319 +/- 0.0029 using the original population-standard-deviation summary.
+- FCz had a 0.0255 mean gap; Pz was less stable; random-linear reference did
+  not reduce accuracy because its dense Dirichlet weights produce a reference
+  close to CAR.
+- Only 2/3 seeds crossed the predeclared 0.03 screening threshold, and the
+  per-seed worst view switched between Cz and FCz.
+- Representation sensitivity remained clear (single-reference linear CKA
+  approximately 0.75--0.77), but downstream degradation was judged
+  weak/marginal rather than conclusive.
+
+## 2026-07-13 — Decision and statistical-audit protocol
+
+- Do not use the mean of a separately selected worst view per seed as the
+  headline effect. Select one fixed reference across seeds.
+- Separate `probe_seed` from `reference_seed`: vary optimization while keeping
+  the physical transform and frozen token cache fixed.
+- Enable strict PyTorch determinism and repeat seed 7 to audit the earlier
+  same-seed clean-score discrepancy.
+- Save trial/subject identifiers and predictions, then calculate paired
+  subject-cluster bootstrap confidence intervals for BAcc(CAR)-BAcc(shifted).
+- Use sample standard deviation (`ddof=1`) in multi-seed aggregation.
+- Pure re-referencing remains a positive-control problem because CAR is an
+  exact canonicalization when all channels are retained. The likely paper
+  pivot is a joint reference-and-montage benchmark with missing channels,
+  sparse montages, or bipolar derivations, where CAR alone is insufficient.

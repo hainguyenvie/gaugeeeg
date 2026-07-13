@@ -13,7 +13,12 @@ import pandas as pd
 from .config import dump_config
 from .datasets import EEGDataset, load_physionet_mi
 from .features import Encoder, build_encoder
-from .metrics import classification_metrics, fit_probe, representation_metrics
+from .metrics import (
+    classification_metrics_from_predictions,
+    fit_probe,
+    paired_subject_bootstrap_bacc_gap,
+    representation_metrics,
+)
 from .referencing import apply_reference_view, common_average
 
 
@@ -100,12 +105,20 @@ def _drift_features(encoder: Encoder, features: np.ndarray) -> np.ndarray:
 
 
 def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
-    seed = int(config.get("seed", 7))
+    legacy_seed = int(config.get("seed", 7))
     data_config = config["data"]
     experiment = config["experiment"]
+    probe_seed = int(experiment.get("probe_seed", legacy_seed))
+    reference_seed = int(experiment.get("reference_seed", legacy_seed))
+    strict_determinism = bool(experiment.get("strict_determinism", False))
     output_dir = Path(experiment.get("output_dir", "outputs/run"))
     output_dir.mkdir(parents=True, exist_ok=True)
     dump_config(config, output_dir / "resolved_config.yaml")
+
+    if strict_determinism:
+        from .torch_probe import configure_torch_determinism
+
+        configure_torch_determinism(probe_seed, strict=True)
 
     force_recompute = bool(experiment.get("force_recompute", False))
     dataset = load_physionet_mi(data_config, force_recompute=force_recompute)
@@ -119,6 +132,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     }
     expected_classes = len(dataset.label_names)
     rows: list[dict[str, Any]] = []
+    prediction_frames: list[pd.DataFrame] = []
+    subject_rows: list[dict[str, Any]] = []
+    bootstrap_rows: list[dict[str, Any]] = []
     train_view = str(experiment.get("train_view", "car"))
     views = [str(view) for view in experiment.get("test_views", ["car"])]
     defenses = [str(defense) for defense in experiment.get("defenses", ["none"])]
@@ -132,7 +148,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             subject_ids=splits["train"],
             view=train_view,
             defense=defense,
-            seed=seed,
+            seed=reference_seed,
             cache_dir=feature_cache,
             force_recompute=force_recompute,
         )
@@ -143,7 +159,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             subject_ids=splits["val"],
             view=train_view,
             defense=defense,
-            seed=seed,
+            seed=reference_seed,
             cache_dir=feature_cache,
             force_recompute=force_recompute,
         )
@@ -159,7 +175,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 val_x,
                 val_y,
                 c_grid=[float(c) for c in experiment.get("c_grid", [1.0])],
-                seed=seed,
+                seed=probe_seed,
             )
             predictor = probe.model
             selected_c = probe.selected_c
@@ -177,7 +193,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 val_y,
                 initial_query=initial_query,
                 n_classes=expected_classes,
-                seed=seed,
+                seed=probe_seed,
                 device=str(experiment.get("device", "auto")),
                 batch_size=int(experiment.get("probe_batch_size", 32)),
                 epochs=int(experiment.get("probe_epochs", 20)),
@@ -187,6 +203,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 warmup_epochs=int(experiment.get("probe_warmup_epochs", 5)),
                 patience=int(experiment.get("probe_patience", 5)),
                 clip_grad=float(experiment.get("probe_clip_grad", 2.0)),
+                deterministic=strict_determinism,
             )
             predictor = probe.model
             selected_epoch = probe.selected_epoch
@@ -202,7 +219,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                         "selected_epoch": selected_epoch,
                         "validation_balanced_accuracy": validation_score,
                         "probe": probe_name,
-                        "seed": seed,
+                        "probe_seed": probe_seed,
+                        "reference_seed": reference_seed,
+                        "strict_determinism": strict_determinism,
                     },
                     output_dir / f"probe_best_{defense}.pt",
                 )
@@ -221,7 +240,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 subject_ids=splits["test"],
                 view=view,
                 defense=defense,
-                seed=seed,
+                seed=reference_seed,
                 cache_dir=feature_cache,
                 force_recompute=force_recompute,
             )
@@ -235,17 +254,38 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         if "car" not in test_features or test_labels is None:
             raise RuntimeError("A CAR test view is required")
         car_features = test_features["car"]
-        car_metrics = classification_metrics(predictor, car_features, test_labels)
+        test_subjects = dataset.subset(splits["test"]).subjects
+        if test_subjects.size != test_labels.size:
+            raise RuntimeError("Test subject metadata is not aligned with cached test labels")
+
+        predictions: dict[str, np.ndarray] = {}
+        probabilities: dict[str, np.ndarray | None] = {}
+        task_metrics: dict[str, dict[str, float]] = {}
+        for view in views:
+            key = view.casefold()
+            predictions[key] = predictor.predict(test_features[key])
+            try:
+                probabilities[key] = predictor.predict_proba(test_features[key])
+            except (AttributeError, ValueError):
+                probabilities[key] = None
+            task_metrics[key] = classification_metrics_from_predictions(
+                test_labels,
+                predictions[key],
+                probabilities[key],
+            )
+        car_metrics = task_metrics["car"]
 
         for view in views:
             key = view.casefold()
-            metrics = classification_metrics(predictor, test_features[key], test_labels)
+            metrics = task_metrics[key]
             drift = representation_metrics(
                 _drift_features(encoder, car_features),
                 _drift_features(encoder, test_features[key]),
             )
             row = {
-                "seed": seed,
+                "seed": probe_seed,
+                "probe_seed": probe_seed,
+                "reference_seed": reference_seed,
                 "encoder": encoder.name,
                 "defense": defense,
                 "train_view": train_view,
@@ -265,8 +305,85 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             }
             rows.append(row)
 
+            if bool(experiment.get("save_predictions", False)):
+                prediction_frame = pd.DataFrame(
+                    {
+                        "probe_seed": probe_seed,
+                        "reference_seed": reference_seed,
+                        "defense": defense,
+                        "test_view": view,
+                        "trial_index": np.arange(test_labels.size),
+                        "subject_id": test_subjects,
+                        "y_true": test_labels,
+                        "y_pred": predictions[key],
+                        "correct": predictions[key] == test_labels,
+                    }
+                )
+                probability = probabilities[key]
+                if probability is not None:
+                    for class_index, class_name in enumerate(dataset.label_names):
+                        prediction_frame[f"prob_{class_name}"] = probability[:, class_index]
+                prediction_frames.append(prediction_frame)
+
+            for subject in np.unique(test_subjects):
+                mask = test_subjects == subject
+                subject_metrics = classification_metrics_from_predictions(
+                    test_labels[mask],
+                    predictions[key][mask],
+                    None if probabilities[key] is None else probabilities[key][mask],
+                )
+                car_subject_metrics = classification_metrics_from_predictions(
+                    test_labels[mask],
+                    predictions["car"][mask],
+                    None if probabilities["car"] is None else probabilities["car"][mask],
+                )
+                subject_rows.append(
+                    {
+                        "probe_seed": probe_seed,
+                        "reference_seed": reference_seed,
+                        "defense": defense,
+                        "test_view": view,
+                        "subject_id": int(subject),
+                        "n_trials": int(mask.sum()),
+                        **subject_metrics,
+                        "balanced_accuracy_gap_from_car": (
+                            car_subject_metrics["balanced_accuracy"] - subject_metrics["balanced_accuracy"]
+                        ),
+                    }
+                )
+
+            bootstrap_resamples = int(experiment.get("bootstrap_resamples", 0))
+            if key != "car" and bootstrap_resamples > 0:
+                bootstrap = paired_subject_bootstrap_bacc_gap(
+                    test_labels,
+                    predictions["car"],
+                    predictions[key],
+                    test_subjects,
+                    n_resamples=bootstrap_resamples,
+                    confidence=float(experiment.get("bootstrap_confidence", 0.95)),
+                    seed=int(experiment.get("bootstrap_seed", 20260713)),
+                )
+                bootstrap_rows.append(
+                    {
+                        "probe_seed": probe_seed,
+                        "reference_seed": reference_seed,
+                        "defense": defense,
+                        "test_view": view,
+                        **bootstrap,
+                        "ci_excludes_zero": bool(bootstrap["ci_lower"] > 0.0),
+                    }
+                )
+
     results = pd.DataFrame(rows)
     results.to_csv(output_dir / "metrics.csv", index=False)
+    if prediction_frames:
+        pd.concat(prediction_frames, ignore_index=True).to_csv(
+            output_dir / "predictions.csv", index=False
+        )
+    if subject_rows:
+        pd.DataFrame(subject_rows).to_csv(output_dir / "subject_metrics.csv", index=False)
+    if bootstrap_rows:
+        pd.DataFrame(bootstrap_rows).to_csv(output_dir / "paired_subject_bootstrap.csv", index=False)
     clean_bacc = float(
         results.loc[
             (results["defense"] == "none") & (results["test_view"].str.lower() == "car"),
@@ -287,7 +404,10 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     stress_threshold = float(experiment.get("stress_effect_min_balanced_accuracy_drop", 0.03))
     summary = {
         "encoder": encoder.name,
-        "seed": seed,
+        "seed": probe_seed,
+        "probe_seed": probe_seed,
+        "reference_seed": reference_seed,
+        "strict_determinism": strict_determinism,
         "n_trials": int(dataset.y.size),
         "n_channels": len(dataset.channel_names),
         "sfreq": dataset.sfreq,
@@ -303,6 +423,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "stress_effect_detected": bool(largest_drop >= stress_threshold),
         "feature_cache_dir": str(feature_cache),
         "metrics_path": str(output_dir / "metrics.csv"),
+        "predictions_path": str(output_dir / "predictions.csv") if prediction_frames else None,
+        "subject_metrics_path": str(output_dir / "subject_metrics.csv"),
+        "paired_subject_bootstrap_path": (
+            str(output_dir / "paired_subject_bootstrap.csv") if bootstrap_rows else None
+        ),
     }
     with (output_dir / "summary.json").open("w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2)

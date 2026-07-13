@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import numpy as np
@@ -47,6 +48,25 @@ class TorchTokenPredictor:
         return probability / probability.sum(axis=1, keepdims=True)
 
 
+def configure_torch_determinism(seed: int, *, strict: bool) -> None:
+    """Configure deterministic probe training before CUDA is initialized."""
+
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    import torch
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = strict
+    if hasattr(torch.backends, "cuda") and hasattr(torch.backends.cuda, "matmul"):
+        torch.backends.cuda.matmul.allow_tf32 = False
+    if hasattr(torch.backends, "cudnn"):
+        torch.backends.cudnn.allow_tf32 = False
+    torch.use_deterministic_algorithms(strict, warn_only=False)
+
+
 def fit_reve_token_probe(
     train_x: NDArray[np.floating],
     train_y: NDArray[np.integer],
@@ -65,6 +85,7 @@ def fit_reve_token_probe(
     warmup_epochs: int = 5,
     patience: int = 5,
     clip_grad: float = 2.0,
+    deterministic: bool = False,
 ) -> TorchProbeResult:
     """Fit REVE's released token-level LP head with a frozen cached encoder."""
     try:
@@ -83,10 +104,7 @@ def fit_reve_token_probe(
     if str(device).startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested for the REVE token probe but is unavailable")
 
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+    configure_torch_determinism(seed, strict=deterministic)
 
     class RMSNorm(nn.Module):
         def __init__(self, dim: int, eps: float = 1e-6) -> None:

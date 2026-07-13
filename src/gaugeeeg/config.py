@@ -62,6 +62,8 @@ def with_overrides(
     device: str | None = None,
     output_dir: str | None = None,
     force_recompute: bool | None = None,
+    probe_seed: int | None = None,
+    reference_seed: int | None = None,
 ) -> dict[str, Any]:
     result = deepcopy(config)
     experiment = result["experiment"]
@@ -73,6 +75,10 @@ def with_overrides(
         experiment["output_dir"] = output_dir
     if force_recompute is not None:
         experiment["force_recompute"] = force_recompute
+    if probe_seed is not None:
+        experiment["probe_seed"] = int(probe_seed)
+    if reference_seed is not None:
+        experiment["reference_seed"] = int(reference_seed)
     validate_config(result)
     return result
 
