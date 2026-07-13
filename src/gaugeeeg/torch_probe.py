@@ -131,7 +131,7 @@ def fit_reve_token_probe(
         pin_memory=str(device).startswith("cuda"),
     )
     predictor = TorchTokenPredictor(model, device=device, batch_size=batch_size)
-    total_warmup_steps = max(1, warmup_epochs * len(train_loader))
+    total_warmup_steps = warmup_epochs * len(train_loader)
     global_step = 0
     best_score = -1.0
     best_epoch = 0
