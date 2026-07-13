@@ -22,7 +22,8 @@ PhysioNetMI evaluation. The first benchmark uses the open-access
 - Leakage-safe subject splits and a four-class motor-imagery task matching the
   task definition used by REVE (left fist, right fist, both fists, both feet).
 - A lightweight log-bandpower baseline that runs without a GPU or model access.
-- Frozen REVE embeddings plus a linear probe.
+- Frozen REVE embeddings plus both a lightweight logistic probe and an
+  official-like token-level PyTorch probe.
 - Reference-shift accuracy, balanced accuracy, macro-F1, AUROC, cosine drift,
   relative L2 drift, and linear CKA.
 - Two initial conditions: unprotected input and exact CAR canonicalization.
@@ -81,10 +82,36 @@ frozen. The implementation follows the released interface: 200 Hz EEG,
 electrode coordinates from `brain-bzh/reve-positions`, input in microvolts
 divided by 100, and the model's attention-pooling head.
 
-## Full benchmark
+## Next experiment: reproduce the clean REVE baseline first
 
-After the pilot succeeds, run the official subject split (1-70 train, 71-89
-validation, 90-109 test):
+The 12-subject pilot is not sufficient for a reference-robustness claim: its
+clean REVE balanced accuracy is near four-class chance. Before running any more
+reference views, reproduce a useful clean classifier on the released 70/19/20
+subject split:
+
+```bash
+gaugeeeg run --config configs/reve_clean_gate.yaml --device cuda
+cat outputs/reve_clean_gate/summary.json
+```
+
+This configuration follows the released REVE PhysioNetMI LP shape: frozen
+token features, pretrained query-token initialization, query attention,
+flattened tokens, RMSNorm, dropout, and a linear head trained for up to 20
+epochs. It uses AdamW as the local equivalent of REVE's StableAdamW setting.
+Token caches are stored as float16 because the full frozen feature tensor is
+large. Expect several GB of cache and substantial first-run GPU time.
+
+`clean_gate_passed` requires balanced accuracy >= 0.45. The paper reports
+0.537 +/- 0.005 for pooled REVE-Base and 0.510 +/- 0.012 for its non-pooled
+variant; the gate is deliberately below those targets. Do not interpret
+reference shifts until this gate passes.
+
+## Full reference benchmark
+
+After the clean gate passes, the existing full configuration can still be used
+for the lightweight attention-pooled ablation. A token-probe stress config will
+be enabled after the clean run establishes which released LP variant is
+reproducible on the local environment.
 
 ```bash
 gaugeeeg run \

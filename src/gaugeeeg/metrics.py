@@ -62,7 +62,7 @@ def fit_probe(
 
 
 def classification_metrics(
-    model: Pipeline,
+    model,
     x: NDArray[np.floating],
     y: NDArray[np.integer],
 ) -> dict[str, float]:

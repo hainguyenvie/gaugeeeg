@@ -48,6 +48,11 @@ def validate_config(config: dict[str, Any]) -> None:
         raise ValueError("v0.1 uses CAR as the clean training reference")
     if "car" not in [str(v).lower() for v in experiment.get("test_views", [])]:
         raise ValueError("test_views must include 'car' as the clean reference")
+    probe = str(experiment.get("probe", "sklearn_logreg")).casefold()
+    if probe not in {"sklearn_logreg", "reve_token"}:
+        raise ValueError("probe must be 'sklearn_logreg' or 'reve_token'")
+    if probe == "reve_token" and experiment.get("reve_pooling") != "tokens":
+        raise ValueError("probe: reve_token requires reve_pooling: tokens")
 
 
 def with_overrides(

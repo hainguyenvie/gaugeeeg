@@ -12,6 +12,7 @@ from scipy.signal import welch
 
 class Encoder(Protocol):
     name: str
+    cache_signature: str
 
     def transform(
         self,
@@ -25,6 +26,7 @@ class BandpowerEncoder:
     """Log absolute bandpower per channel; intentionally reference-sensitive."""
 
     name = "bandpower"
+    cache_signature = "bandpower:v1"
 
     def __init__(self, bands: dict[str, tuple[float, float]] | None = None) -> None:
         self.bands = bands or {
@@ -80,12 +82,13 @@ class FrozenREVEEncoder:
 
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
-        if pooling not in {"attention", "mean"}:
-            raise ValueError("REVE pooling must be 'attention' or 'mean'")
+        if pooling not in {"attention", "mean", "tokens"}:
+            raise ValueError("REVE pooling must be 'attention', 'mean', or 'tokens'")
         self.device = torch.device(device)
         self.batch_size = int(batch_size)
         self.pooling = pooling
         self.input_scale_uv = float(input_scale_uv)
+        self.model_name = model_name
 
         try:
             self.position_bank = AutoModel.from_pretrained(position_model_name, trust_remote_code=True)
@@ -97,6 +100,24 @@ class FrozenREVEEncoder:
             ) from exc
         self.position_bank.to(self.device).eval()
         self.model.to(self.device).eval()
+        self.cache_signature = f"reve:{model_name}:pool={pooling}:scale={self.input_scale_uv:g}:v2"
+
+    @property
+    def pretrained_query(self) -> NDArray[np.float32]:
+        """Return REVE's released global query token for probe initialization."""
+        return self.model.cls_query_token.detach().float().cpu().numpy().reshape(-1).astype(np.float32)
+
+    def summarize_cached(self, features: NDArray[np.floating]) -> NDArray[np.float32]:
+        """Pool cached tokens with the released query for tractable drift metrics."""
+        tokens = np.asarray(features, dtype=np.float32)
+        if tokens.ndim != 3:
+            return tokens.astype(np.float32, copy=False)
+        query = self.pretrained_query
+        scores = np.einsum("ntd,d->nt", tokens, query) / np.sqrt(tokens.shape[-1])
+        scores -= scores.max(axis=1, keepdims=True)
+        weights = np.exp(scores)
+        weights /= weights.sum(axis=1, keepdims=True)
+        return np.einsum("nt,ntd->nd", weights, tokens).astype(np.float32)
 
     def transform(
         self,
@@ -128,10 +149,16 @@ class FrozenREVEEncoder:
                 tokens = self.model(batch, batch_pos)
                 if self.pooling == "attention":
                     embedding = self.model.attention_pooling(tokens)
-                else:
+                elif self.pooling == "mean":
                     embedding = tokens.mean(dim=(1, 2))
-                outputs.append(embedding.float().cpu().numpy())
-        return np.concatenate(outputs, axis=0).astype(np.float32, copy=False)
+                else:
+                    embedding = tokens.flatten(1, 2)
+                array = embedding.float().cpu().numpy()
+                if self.pooling == "tokens":
+                    array = array.astype(np.float16)
+                outputs.append(array)
+        dtype = np.float16 if self.pooling == "tokens" else np.float32
+        return np.concatenate(outputs, axis=0).astype(dtype, copy=False)
 
 
 def build_encoder(experiment_config: dict) -> Encoder:

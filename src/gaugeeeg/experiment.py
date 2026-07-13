@@ -19,7 +19,7 @@ from .referencing import apply_reference_view, common_average
 
 def _feature_key(
     *,
-    encoder_name: str,
+    encoder_signature: str,
     split_name: str,
     subjects: list[int],
     view: str,
@@ -28,7 +28,7 @@ def _feature_key(
 ) -> str:
     payload = json.dumps(
         {
-            "encoder": encoder_name,
+            "encoder": encoder_signature,
             "split": split_name,
             "subjects": subjects,
             "view": view,
@@ -63,7 +63,7 @@ def _extract_features(
 ) -> tuple[np.ndarray, np.ndarray]:
     subset = dataset.subset(subject_ids)
     cache_key = _feature_key(
-        encoder_name=encoder.name,
+        encoder_signature=encoder.cache_signature,
         split_name=split_name,
         subjects=subject_ids,
         view=view,
@@ -88,6 +88,15 @@ def _validate_labels(name: str, y: np.ndarray, expected_classes: int) -> None:
     expected = np.arange(expected_classes)
     if not np.array_equal(present, expected):
         raise RuntimeError(f"{name} split has labels {present.tolist()}, expected {expected.tolist()}")
+
+
+def _drift_features(encoder: Encoder, features: np.ndarray) -> np.ndarray:
+    if features.ndim == 2:
+        return features
+    summarize = getattr(encoder, "summarize_cached", None)
+    if summarize is None:
+        raise RuntimeError("Encoder emitted token features without a drift summarizer")
+    return summarize(features)
 
 
 def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
@@ -140,14 +149,50 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         )
         _validate_labels("train", train_y, expected_classes)
         _validate_labels("validation", val_y, expected_classes)
-        probe = fit_probe(
-            train_x,
-            train_y,
-            val_x,
-            val_y,
-            c_grid=[float(c) for c in experiment.get("c_grid", [1.0])],
-            seed=seed,
-        )
+        probe_name = str(experiment.get("probe", "sklearn_logreg")).casefold()
+        selected_c = float("nan")
+        selected_epoch = 0
+        if probe_name == "sklearn_logreg":
+            probe = fit_probe(
+                train_x,
+                train_y,
+                val_x,
+                val_y,
+                c_grid=[float(c) for c in experiment.get("c_grid", [1.0])],
+                seed=seed,
+            )
+            predictor = probe.model
+            selected_c = probe.selected_c
+            validation_score = probe.validation_balanced_accuracy
+        elif probe_name == "reve_token":
+            from .torch_probe import fit_reve_token_probe
+
+            initial_query = getattr(encoder, "pretrained_query", None)
+            if initial_query is None:
+                raise ValueError("probe: reve_token requires encoder: reve")
+            probe = fit_reve_token_probe(
+                train_x,
+                train_y,
+                val_x,
+                val_y,
+                initial_query=initial_query,
+                n_classes=expected_classes,
+                seed=seed,
+                device=str(experiment.get("device", "auto")),
+                batch_size=int(experiment.get("probe_batch_size", 32)),
+                epochs=int(experiment.get("probe_epochs", 20)),
+                learning_rate=float(experiment.get("probe_learning_rate", 1e-4)),
+                weight_decay=float(experiment.get("probe_weight_decay", 1e-2)),
+                dropout=float(experiment.get("probe_dropout", 0.1)),
+                warmup_epochs=int(experiment.get("probe_warmup_epochs", 5)),
+                patience=int(experiment.get("probe_patience", 5)),
+                clip_grad=float(experiment.get("probe_clip_grad", 2.0)),
+            )
+            predictor = probe.model
+            selected_epoch = probe.selected_epoch
+            validation_score = probe.validation_balanced_accuracy
+        else:
+            raise ValueError(f"Unknown probe: {probe_name}")
 
         test_features: dict[str, np.ndarray] = {}
         test_labels: np.ndarray | None = None
@@ -173,12 +218,15 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         if "car" not in test_features or test_labels is None:
             raise RuntimeError("A CAR test view is required")
         car_features = test_features["car"]
-        car_metrics = classification_metrics(probe.model, car_features, test_labels)
+        car_metrics = classification_metrics(predictor, car_features, test_labels)
 
         for view in views:
             key = view.casefold()
-            metrics = classification_metrics(probe.model, test_features[key], test_labels)
-            drift = representation_metrics(car_features, test_features[key])
+            metrics = classification_metrics(predictor, test_features[key], test_labels)
+            drift = representation_metrics(
+                _drift_features(encoder, car_features),
+                _drift_features(encoder, test_features[key]),
+            )
             row = {
                 "seed": seed,
                 "encoder": encoder.name,
@@ -188,8 +236,10 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 "n_train": int(train_y.size),
                 "n_val": int(val_y.size),
                 "n_test": int(test_labels.size),
-                "selected_c": probe.selected_c,
-                "validation_balanced_accuracy": probe.validation_balanced_accuracy,
+                "probe": probe_name,
+                "selected_c": selected_c,
+                "selected_epoch": selected_epoch,
+                "validation_balanced_accuracy": validation_score,
                 **metrics,
                 **drift,
                 "balanced_accuracy_gap_from_car": (
@@ -200,6 +250,13 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
 
     results = pd.DataFrame(rows)
     results.to_csv(output_dir / "metrics.csv", index=False)
+    clean_bacc = float(
+        results.loc[
+            (results["defense"] == "none") & (results["test_view"].str.lower() == "car"),
+            "balanced_accuracy",
+        ].iloc[0]
+    )
+    gate_threshold = float(experiment.get("clean_gate_min_balanced_accuracy", 0.0))
     summary = {
         "encoder": encoder.name,
         "seed": seed,
@@ -208,6 +265,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "sfreq": dataset.sfreq,
         "largest_balanced_accuracy_gap": float(results["balanced_accuracy_gap_from_car"].max()),
         "lowest_paired_cosine": float(results["paired_cosine_to_car"].min()),
+        "clean_car_balanced_accuracy": clean_bacc,
+        "clean_gate_min_balanced_accuracy": gate_threshold,
+        "clean_gate_passed": bool(clean_bacc >= gate_threshold),
         "metrics_path": str(output_dir / "metrics.csv"),
     }
     with (output_dir / "summary.json").open("w", encoding="utf-8") as handle:
