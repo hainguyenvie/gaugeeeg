@@ -1,0 +1,13 @@
+{
+  "probe_seeds": [
+    7,
+    21,
+    42
+  ],
+  "n_resamples": 10000,
+  "confidence": 0.95,
+  "largest_absolute_mean_recall_shift_view": "cz",
+  "largest_absolute_mean_recall_shift_class": "left_fist",
+  "largest_absolute_mean_recall_gap": 0.20694752402069475,
+  "selection_note": "exploratory maximum; Cz/left_fist is predeclared for the next method screen"
+}

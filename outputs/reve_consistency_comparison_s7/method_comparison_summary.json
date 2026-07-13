@@ -1,0 +1,13 @@
+{
+  "target_view": "cz",
+  "target_class_index": 0,
+  "predeclared_primary_metric": "held-out-view target-class recall gap",
+  "success_thresholds": {
+    "relative_recall_gap_reduction_vs_car_only": 0.3,
+    "maximum_clean_balanced_accuracy_drop": 0.01
+  },
+  "augmentation_passes": true,
+  "consistency_passes": true,
+  "consistency_beats_augmentation_on_primary": true,
+  "interpretation_rule": "Claim rule-loss value only if rule_consistency passes and beats multi_view_ce; otherwise attribute recovery to augmentation."
+}
