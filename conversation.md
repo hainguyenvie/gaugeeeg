@@ -121,3 +121,40 @@ the working hypothesis or paper direction.
   exact canonicalization when all channels are retained. The likely paper
   pivot is a joint reference-and-montage benchmark with missing channels,
   sparse montages, or bipolar derivations, where CAR alone is insufficient.
+
+## 2026-07-13 — Deterministic subject-level audit result
+
+- The seed-7 run and exact repeat produced byte-identical metrics, predictions,
+  and subject metrics. The previous same-seed discrepancy was therefore a CUDA
+  determinism issue and is now resolved.
+- Fixed-reference Cz BAcc gaps for probe seeds 7/21/42 were 0.0603, 0.0216, and
+  0.0238. The mean was 0.0352 with sample standard deviation 0.0217.
+- Paired subject-cluster 95% CIs excluded zero for Cz in seeds 7 and 21, but the
+  seed-21 lower bound was only 0.0001 and seed 42 included zero. The global
+  downstream degradation remains weak/marginal across probe optimization.
+- The class-conditional effect was much more stable: under Cz, left-fist recall
+  dropped by 0.2069 +/- 0.0130 across seeds, predicted left-fist prevalence
+  dropped by 0.1113, and mean left-fist probability dropped by 0.1039.
+- Cz simultaneously improved both-fists recall by approximately 0.0956, so
+  aggregate BAcc partially cancels the systematic label-geometry shift.
+- Reframed limitation: physically equivalent reference conventions induce
+  systematic class-conditional decision bias in a frozen EEG foundation model,
+  which aggregate performance metrics can hide.
+
+## 2026-07-13 — Held-out-reference consistency screen
+
+- Primary target: Cz-induced left-fist recall gap. Cz must not appear in probe
+  training or validation.
+- Training views: CAR, Pz, and FCz with aligned trials and fixed
+  `reference_seed=7`.
+- Baseline A: deterministic CAR-only probe already available.
+- Baseline B: supervised multi-view cross-entropy (`multi_view_ce`).
+- Proposed method: the same multi-view cross-entropy plus Jensen-Shannon
+  consistency across paired reference views (`rule_consistency`).
+- Seed-7 success criteria are predeclared: at least 30% relative reduction of
+  the held-out-Cz left-fist recall gap and at most 0.01 absolute CAR BAcc loss.
+- Attribute novelty to the rule term only if consistency passes and improves
+  over multi-view augmentation. If augmentation performs equally well, the
+  consistency loss is not a supported contribution.
+- Only after the seed-7 gate passes should seeds 21/42 and reference-plus-montage
+  experiments be run.

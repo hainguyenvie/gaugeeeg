@@ -136,39 +136,69 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     subject_rows: list[dict[str, Any]] = []
     bootstrap_rows: list[dict[str, Any]] = []
     train_view = str(experiment.get("train_view", "car"))
+    training_views = [str(view) for view in experiment.get("training_views", [train_view])]
+    if not training_views or training_views[0].casefold() != "car":
+        raise ValueError("training_views must be non-empty with CAR as view zero")
+    probe_objective = str(experiment.get("probe_objective", "car_only")).casefold()
+    consistency_weight = float(experiment.get("consistency_weight", 0.0))
     views = [str(view) for view in experiment.get("test_views", ["car"])]
     defenses = [str(defense) for defense in experiment.get("defenses", ["none"])]
 
     for defense in defenses:
         print(f"\n=== Encoder={encoder.name} | defense={defense} ===")
-        train_x, train_y = _extract_features(
-            dataset,
-            encoder=encoder,
-            split_name="train",
-            subject_ids=splits["train"],
-            view=train_view,
-            defense=defense,
-            seed=reference_seed,
-            cache_dir=feature_cache,
-            force_recompute=force_recompute,
-        )
-        val_x, val_y = _extract_features(
-            dataset,
-            encoder=encoder,
-            split_name="val",
-            subject_ids=splits["val"],
-            view=train_view,
-            defense=defense,
-            seed=reference_seed,
-            cache_dir=feature_cache,
-            force_recompute=force_recompute,
-        )
+        train_features: list[np.ndarray] = []
+        val_features: list[np.ndarray] = []
+        train_y: np.ndarray | None = None
+        val_y: np.ndarray | None = None
+        for training_view in training_views:
+            current_train_x, current_train_y = _extract_features(
+                dataset,
+                encoder=encoder,
+                split_name="train",
+                subject_ids=splits["train"],
+                view=training_view,
+                defense=defense,
+                seed=reference_seed,
+                cache_dir=feature_cache,
+                force_recompute=force_recompute,
+            )
+            current_val_x, current_val_y = _extract_features(
+                dataset,
+                encoder=encoder,
+                split_name="val",
+                subject_ids=splits["val"],
+                view=training_view,
+                defense=defense,
+                seed=reference_seed,
+                cache_dir=feature_cache,
+                force_recompute=force_recompute,
+            )
+            if train_y is None:
+                train_y = current_train_y
+                val_y = current_val_y
+            elif not np.array_equal(train_y, current_train_y) or not np.array_equal(
+                val_y, current_val_y
+            ):
+                raise RuntimeError("Train/validation label order changed across reference views")
+            train_features.append(current_train_x)
+            val_features.append(current_val_x)
+
+        if train_y is None or val_y is None:
+            raise RuntimeError("No training features were extracted")
+        if len(training_views) == 1:
+            train_x = train_features[0]
+            val_x = val_features[0]
+        else:
+            train_x = np.stack(train_features, axis=1)
+            val_x = np.stack(val_features, axis=1)
         _validate_labels("train", train_y, expected_classes)
         _validate_labels("validation", val_y, expected_classes)
         probe_name = str(experiment.get("probe", "sklearn_logreg")).casefold()
         selected_c = float("nan")
         selected_epoch = 0
         if probe_name == "sklearn_logreg":
+            if len(training_views) != 1:
+                raise ValueError("sklearn_logreg does not support aligned multi-view training")
             probe = fit_probe(
                 train_x,
                 train_y,
@@ -204,6 +234,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 patience=int(experiment.get("probe_patience", 5)),
                 clip_grad=float(experiment.get("probe_clip_grad", 2.0)),
                 deterministic=strict_determinism,
+                objective=probe_objective,
+                consistency_weight=consistency_weight,
             )
             predictor = probe.model
             selected_epoch = probe.selected_epoch
@@ -222,6 +254,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                         "probe_seed": probe_seed,
                         "reference_seed": reference_seed,
                         "strict_determinism": strict_determinism,
+                        "probe_objective": probe_objective,
+                        "training_views": training_views,
+                        "consistency_weight": consistency_weight,
                     },
                     output_dir / f"probe_best_{defense}.pt",
                 )
@@ -289,11 +324,14 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 "encoder": encoder.name,
                 "defense": defense,
                 "train_view": train_view,
+                "training_views": "|".join(training_views),
                 "test_view": view,
                 "n_train": int(train_y.size),
                 "n_val": int(val_y.size),
                 "n_test": int(test_labels.size),
                 "probe": probe_name,
+                "probe_objective": probe_objective,
+                "consistency_weight": consistency_weight,
                 "selected_c": selected_c,
                 "selected_epoch": selected_epoch,
                 "validation_balanced_accuracy": validation_score,
@@ -408,6 +446,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "probe_seed": probe_seed,
         "reference_seed": reference_seed,
         "strict_determinism": strict_determinism,
+        "probe_objective": probe_objective,
+        "training_views": training_views,
+        "consistency_weight": consistency_weight,
         "n_trials": int(dataset.y.size),
         "n_channels": len(dataset.channel_names),
         "sfreq": dataset.sfreq,

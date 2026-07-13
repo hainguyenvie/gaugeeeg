@@ -24,6 +24,8 @@ def _run_command(args: argparse.Namespace) -> None:
         force_recompute=True if args.force_recompute else None,
         probe_seed=args.probe_seed,
         reference_seed=args.reference_seed,
+        probe_objective=args.probe_objective,
+        consistency_weight=args.consistency_weight,
     )
     run_experiment(config)
 
@@ -85,6 +87,33 @@ def _aggregate_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _class_bias_command(args: argparse.Namespace) -> None:
+    from .class_bias import analyze_class_bias
+
+    result = analyze_class_bias(
+        args.runs,
+        args.output_dir,
+        n_resamples=args.bootstrap_resamples,
+        confidence=args.bootstrap_confidence,
+        seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
+def _compare_methods_command(args: argparse.Namespace) -> None:
+    from .method_compare import compare_consistency_methods
+
+    result = compare_consistency_methods(
+        args.baseline,
+        args.augmentation,
+        args.consistency,
+        args.output_dir,
+        target_view=args.target_view,
+        target_class=args.target_class,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -97,6 +126,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--force-recompute", action="store_true")
     run.add_argument("--probe-seed", type=int, help="Probe initialization/data-order seed")
     run.add_argument("--reference-seed", type=int, help="Fixed seed for stochastic reference views")
+    run.add_argument(
+        "--probe-objective",
+        choices=["car_only", "multi_view_ce", "rule_consistency"],
+    )
+    run.add_argument("--consistency-weight", type=float)
     run.set_defaults(handler=_run_command)
 
     download = subparsers.add_parser("download", help="Download and cache the configured dataset")
@@ -116,6 +150,27 @@ def build_parser() -> argparse.ArgumentParser:
     aggregate.add_argument("--runs", nargs="+", required=True, help="Audit output directories")
     aggregate.add_argument("--output-dir", default="outputs/reve_statistical_audit_multiseed")
     aggregate.set_defaults(handler=_aggregate_command)
+
+    class_bias = subparsers.add_parser(
+        "class-bias-audit", help="Audit class-conditional shifts from saved predictions"
+    )
+    class_bias.add_argument("--runs", nargs="+", required=True)
+    class_bias.add_argument("--output-dir", default="outputs/reve_class_bias_audit")
+    class_bias.add_argument("--bootstrap-resamples", type=int, default=10000)
+    class_bias.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    class_bias.add_argument("--bootstrap-seed", type=int, default=20260713)
+    class_bias.set_defaults(handler=_class_bias_command)
+
+    compare_methods = subparsers.add_parser(
+        "compare-methods", help="Compare CAR-only, augmentation, and consistency probes"
+    )
+    compare_methods.add_argument("--baseline", required=True)
+    compare_methods.add_argument("--augmentation", required=True)
+    compare_methods.add_argument("--consistency", required=True)
+    compare_methods.add_argument("--target-view", default="cz")
+    compare_methods.add_argument("--target-class", type=int, default=0)
+    compare_methods.add_argument("--output-dir", default="outputs/reve_consistency_comparison_s7")
+    compare_methods.set_defaults(handler=_compare_methods_command)
     return parser
 
 

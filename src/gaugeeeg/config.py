@@ -53,6 +53,16 @@ def validate_config(config: dict[str, Any]) -> None:
         raise ValueError("probe must be 'sklearn_logreg' or 'reve_token'")
     if probe == "reve_token" and experiment.get("reve_pooling") != "tokens":
         raise ValueError("probe: reve_token requires reve_pooling: tokens")
+    training_views = [str(view).casefold() for view in experiment.get("training_views", ["car"])]
+    if not training_views or training_views[0] != "car":
+        raise ValueError("training_views must start with 'car'")
+    objective = str(experiment.get("probe_objective", "car_only")).casefold()
+    if objective not in {"car_only", "multi_view_ce", "rule_consistency"}:
+        raise ValueError("Unknown probe_objective")
+    if objective != "car_only" and len(training_views) < 2:
+        raise ValueError(f"{objective} requires at least two training_views")
+    if float(experiment.get("consistency_weight", 0.0)) < 0.0:
+        raise ValueError("consistency_weight must be non-negative")
 
 
 def with_overrides(
@@ -64,6 +74,8 @@ def with_overrides(
     force_recompute: bool | None = None,
     probe_seed: int | None = None,
     reference_seed: int | None = None,
+    probe_objective: str | None = None,
+    consistency_weight: float | None = None,
 ) -> dict[str, Any]:
     result = deepcopy(config)
     experiment = result["experiment"]
@@ -79,6 +91,10 @@ def with_overrides(
         experiment["probe_seed"] = int(probe_seed)
     if reference_seed is not None:
         experiment["reference_seed"] = int(reference_seed)
+    if probe_objective is not None:
+        experiment["probe_objective"] = str(probe_objective)
+    if consistency_weight is not None:
+        experiment["consistency_weight"] = float(consistency_weight)
     validate_config(result)
     return result
 

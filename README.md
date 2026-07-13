@@ -162,6 +162,59 @@ subject-cluster bootstrap confidence interval. Aggregation uses sample standard
 deviation (`ddof=1`) and selects one fixed worst reference across seeds instead
 of averaging a separately selected maximum from each seed.
 
+## Class-bias audit and held-out-reference method screen
+
+The deterministic audit showed that aggregate BAcc hides a much larger and
+repeatable class-conditional shift. Generate the class-level evidence without
+any GPU work:
+
+```bash
+gaugeeeg class-bias-audit \
+  --runs outputs/reve_statistical_audit_s7 \
+         outputs/reve_statistical_audit_s21 \
+         outputs/reve_statistical_audit_s42 \
+  --output-dir outputs/reve_class_bias_audit
+```
+
+The predeclared method target is the Cz-induced left-fist recall gap. Cz is
+held completely outside the training views. First run supervised multi-view
+augmentation on CAR/Pz/FCz:
+
+```bash
+gaugeeeg run \
+  --config configs/reve_consistency_screen.yaml \
+  --probe-objective multi_view_ce \
+  --output-dir outputs/reve_multiview_ce_s7
+```
+
+The first command must extract Pz/FCz train and validation tokens, so it is the
+expensive run. It reuses all existing CAR and test tokens. Next run the proposed
+rule-consistency objective; this should reuse every frozen token cache:
+
+```bash
+gaugeeeg run \
+  --config configs/reve_consistency_screen.yaml \
+  --probe-objective rule_consistency \
+  --consistency-weight 1.0 \
+  --output-dir outputs/reve_rule_consistency_s7
+```
+
+Compare both methods against the deterministic CAR-only seed-7 baseline:
+
+```bash
+gaugeeeg compare-methods \
+  --baseline outputs/reve_statistical_audit_s7 \
+  --augmentation outputs/reve_multiview_ce_s7 \
+  --consistency outputs/reve_rule_consistency_s7 \
+  --output-dir outputs/reve_consistency_comparison_s7
+```
+
+The method screen passes when the held-out-Cz left-fist recall gap is reduced
+by at least 30% while CAR BAcc falls by no more than one point. A contribution
+from the rule loss is supported only if `rule_consistency` also beats
+`multi_view_ce`; otherwise recovery must be attributed to ordinary data
+augmentation. Do not run seeds 21/42 until the seed-7 method screen passes.
+
 ## Reading the output
 
 Each run creates:

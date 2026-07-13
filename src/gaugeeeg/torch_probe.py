@@ -86,8 +86,15 @@ def fit_reve_token_probe(
     patience: int = 5,
     clip_grad: float = 2.0,
     deterministic: bool = False,
+    objective: str = "car_only",
+    consistency_weight: float = 0.0,
 ) -> TorchProbeResult:
-    """Fit REVE's released token-level LP head with a frozen cached encoder."""
+    """Fit a frozen-REVE probe with optional paired multi-view consistency.
+
+    Inputs may be ``(trials, tokens, dim)`` for the original CAR-only probe or
+    ``(trials, views, tokens, dim)`` for multi-reference objectives. View zero
+    must be CAR so clean validation remains explicitly observable.
+    """
     try:
         import torch
         from sklearn.metrics import balanced_accuracy_score
@@ -97,8 +104,20 @@ def fit_reve_token_probe(
         message = 'Token probe dependencies are missing. Install with: pip install -e ".[reve]"'
         raise RuntimeError(message) from exc
 
-    if train_x.ndim != 3 or val_x.ndim != 3:
-        raise ValueError("reve_token probe expects features shaped (trials, tokens, embedding_dim)")
+    objective = objective.casefold()
+    allowed_objectives = {"car_only", "multi_view_ce", "rule_consistency"}
+    if objective not in allowed_objectives:
+        message = f"Unknown probe objective {objective!r}; expected one of {sorted(allowed_objectives)}"
+        raise ValueError(message)
+    if train_x.ndim not in {3, 4} or val_x.ndim != train_x.ndim:
+        raise ValueError("Token features must be 3D CAR-only arrays or aligned 4D multi-view arrays")
+    if train_x.ndim == 3:
+        train_x = train_x[:, None, :, :]
+        val_x = val_x[:, None, :, :]
+    if train_x.shape[1] < 2 and objective != "car_only":
+        raise ValueError(f"{objective} requires at least two aligned reference views")
+    if consistency_weight < 0.0:
+        raise ValueError("consistency_weight must be non-negative")
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
     if str(device).startswith("cuda") and not torch.cuda.is_available():
@@ -119,7 +138,7 @@ def fit_reve_token_probe(
     class ReveTokenHead(nn.Module):
         def __init__(self) -> None:
             super().__init__()
-            n_tokens, embed_dim = train_x.shape[1:]
+            n_tokens, embed_dim = train_x.shape[-2:]
             query = torch.as_tensor(initial_query, dtype=torch.float32).reshape(1, 1, embed_dim)
             self.query = nn.Parameter(query.clone())
             flat_dim = (n_tokens + 1) * embed_dim
@@ -161,6 +180,8 @@ def fit_reve_token_probe(
     for epoch in range(1, epochs + 1):
         model.train()
         total_loss = 0.0
+        epoch_ce = 0.0
+        epoch_consistency = 0.0
         for tokens, labels in train_loader:
             tokens = tokens.to(device, dtype=torch.float32, non_blocking=True)
             labels = labels.to(device, dtype=torch.long, non_blocking=True)
@@ -169,15 +190,37 @@ def fit_reve_token_probe(
                 for group in optimizer.param_groups:
                     group["lr"] = learning_rate * max(ratio, 1e-3)
             optimizer.zero_grad(set_to_none=True)
-            loss = criterion(model(tokens), labels)
+            batch_size_actual, n_views = tokens.shape[:2]
+            logits = model(tokens.flatten(0, 1)).reshape(batch_size_actual, n_views, n_classes)
+            if objective == "car_only":
+                ce_loss = criterion(logits[:, 0], labels)
+            else:
+                repeated_labels = labels[:, None].expand(-1, n_views).reshape(-1)
+                ce_loss = criterion(logits.reshape(-1, n_classes), repeated_labels)
+
+            consistency_loss = logits.new_zeros(())
+            if objective == "rule_consistency":
+                log_probabilities = torch.log_softmax(logits, dim=-1)
+                probabilities = log_probabilities.exp()
+                mean_probability = probabilities.mean(dim=1, keepdim=True).clamp_min(1e-8)
+                consistency_loss = (
+                    probabilities * (log_probabilities - mean_probability.log())
+                ).sum(dim=-1).mean()
+            loss = ce_loss + consistency_weight * consistency_loss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=clip_grad)
             optimizer.step()
             total_loss += float(loss.item()) * labels.shape[0]
+            epoch_ce += float(ce_loss.item()) * labels.shape[0]
+            epoch_consistency += float(consistency_loss.item()) * labels.shape[0]
             global_step += 1
 
-        prediction = predictor.predict(val_x)
-        score = float(balanced_accuracy_score(val_y, prediction))
+        validation_scores = [
+            float(balanced_accuracy_score(val_y, predictor.predict(val_x[:, view_index])))
+            for view_index in range(val_x.shape[1])
+        ]
+        clean_score = validation_scores[0]
+        score = float(np.mean(validation_scores))
         if epoch > warmup_epochs:
             scheduler.step(score)
         epoch_loss = total_loss / train_y.size
@@ -185,11 +228,17 @@ def fit_reve_token_probe(
             {
                 "epoch": float(epoch),
                 "train_loss": float(epoch_loss),
+                "train_ce_loss": float(epoch_ce / train_y.size),
+                "train_consistency_loss": float(epoch_consistency / train_y.size),
+                "validation_car_balanced_accuracy": clean_score,
                 "validation_balanced_accuracy": score,
                 "learning_rate": float(optimizer.param_groups[0]["lr"]),
             }
         )
-        print(f"LP epoch {epoch:02d}/{epochs} | loss={epoch_loss:.4f} | val_bacc={score:.4f}")
+        print(
+            f"LP epoch {epoch:02d}/{epochs} | loss={epoch_loss:.4f} | "
+            f"val_car={clean_score:.4f} | val_mean={score:.4f}"
+        )
         if score > best_score:
             best_score = score
             best_epoch = epoch
