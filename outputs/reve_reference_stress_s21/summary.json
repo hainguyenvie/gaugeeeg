@@ -1,0 +1,19 @@
+{
+  "encoder": "reve",
+  "seed": 21,
+  "n_trials": 9837,
+  "n_channels": 64,
+  "sfreq": 200.0,
+  "largest_balanced_accuracy_gap": 0.0359965562162442,
+  "lowest_paired_cosine": 0.9796015742423384,
+  "clean_car_balanced_accuracy": 0.5845470909782852,
+  "clean_gate_min_balanced_accuracy": 0.45,
+  "clean_gate_passed": true,
+  "worst_reference_view": "cz",
+  "largest_balanced_accuracy_drop": 0.0359965562162442,
+  "largest_absolute_balanced_accuracy_change": 0.0359965562162442,
+  "stress_effect_min_balanced_accuracy_drop": 0.03,
+  "stress_effect_detected": true,
+  "feature_cache_dir": "outputs/reve_clean_gate/feature_cache",
+  "metrics_path": "outputs/reve_reference_stress_s21/metrics.csv"
+}

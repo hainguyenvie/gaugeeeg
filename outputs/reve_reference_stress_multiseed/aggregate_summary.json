@@ -1,0 +1,40 @@
+{
+  "seeds": [
+    7,
+    21,
+    42
+  ],
+  "threshold": 0.03,
+  "per_seed": [
+    {
+      "seed": 7,
+      "clean_car_bacc": 0.5769,
+      "worst_reference_view": "fcz",
+      "largest_drop": 0.0342,
+      "stress_effect_detected": true
+    },
+    {
+      "seed": 21,
+      "clean_car_bacc": 0.5845,
+      "worst_reference_view": "cz",
+      "largest_drop": 0.036,
+      "stress_effect_detected": true
+    },
+    {
+      "seed": 42,
+      "clean_car_bacc": 0.575,
+      "worst_reference_view": "cz",
+      "largest_drop": 0.0299,
+      "stress_effect_detected": false
+    }
+  ],
+  "n_seeds_detected": 2,
+  "largest_drop_mean": 0.0334,
+  "largest_drop_std": 0.0026,
+  "clean_car_bacc_mean": 0.5788,
+  "worst_reference_views": [
+    "cz",
+    "fcz"
+  ],
+  "verdict": "weak/marginal: drop straddles the 0.03 threshold (2/3 seeds detect), worst reference inconsistent (cz/fcz)"
+}
