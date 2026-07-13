@@ -1,0 +1,13 @@
+{
+  "probe_seeds": [
+    7,
+    21,
+    42
+  ],
+  "reference_seed": 7,
+  "std_ddof": 1,
+  "selection_rule": "largest mean gap for one fixed reference view across all probe seeds",
+  "fixed_worst_reference_view": "cz",
+  "fixed_worst_reference_gap_mean": 0.03524075929901937,
+  "fixed_worst_reference_gap_std": 0.02171931173735342
+}
