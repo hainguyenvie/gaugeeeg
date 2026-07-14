@@ -110,6 +110,26 @@ def _compare_methods_command(args: argparse.Namespace) -> None:
         args.output_dir,
         target_view=args.target_view,
         target_class=args.target_class,
+        n_resamples=args.bootstrap_resamples,
+        confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
+def _aggregate_methods_command(args: argparse.Namespace) -> None:
+    from .method_compare import aggregate_consistency_methods
+
+    result = aggregate_consistency_methods(
+        args.baselines,
+        args.augmentations,
+        args.consistencies,
+        args.output_dir,
+        target_view=args.target_view,
+        target_class=args.target_class,
+        n_resamples=args.bootstrap_resamples,
+        confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
     )
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
@@ -170,7 +190,27 @@ def build_parser() -> argparse.ArgumentParser:
     compare_methods.add_argument("--target-view", default="cz")
     compare_methods.add_argument("--target-class", type=int, default=0)
     compare_methods.add_argument("--output-dir", default="outputs/reve_consistency_comparison_s7")
+    compare_methods.add_argument("--bootstrap-resamples", type=int, default=10000)
+    compare_methods.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    compare_methods.add_argument("--bootstrap-seed", type=int, default=20260714)
     compare_methods.set_defaults(handler=_compare_methods_command)
+
+    aggregate_methods = subparsers.add_parser(
+        "aggregate-methods",
+        help="Aggregate consistency comparisons across probe seeds",
+    )
+    aggregate_methods.add_argument("--baselines", nargs="+", required=True)
+    aggregate_methods.add_argument("--augmentations", nargs="+", required=True)
+    aggregate_methods.add_argument("--consistencies", nargs="+", required=True)
+    aggregate_methods.add_argument("--target-view", default="cz")
+    aggregate_methods.add_argument("--target-class", type=int, default=0)
+    aggregate_methods.add_argument(
+        "--output-dir", default="outputs/reve_consistency_comparison_multiseed"
+    )
+    aggregate_methods.add_argument("--bootstrap-resamples", type=int, default=10000)
+    aggregate_methods.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    aggregate_methods.add_argument("--bootstrap-seed", type=int, default=20260714)
+    aggregate_methods.set_defaults(handler=_aggregate_methods_command)
     return parser
 
 

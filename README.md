@@ -215,6 +215,47 @@ from the rule loss is supported only if `rule_consistency` also beats
 `multi_view_ce`; otherwise recovery must be attributed to ordinary data
 augmentation. Do not run seeds 21/42 until the seed-7 method screen passes.
 
+## Multi-seed confirmation after the seed-7 pass
+
+The seed-7 screen passed, but the direct paired advantage of consistency over
+augmentation was still uncertain across test subjects. Run the predeclared
+confirmation with one command:
+
+```bash
+git pull
+source .venv/bin/activate
+make consistency-multiseed
+```
+
+Equivalently, run `bash scripts/run_consistency_multiseed.sh`. Set
+`DEVICE=cuda:1` before the command if the experiment should use another GPU.
+The script intentionally does not pass `--force-recompute`: it reuses the
+frozen REVE feature cache and trains only four new probes (two objectives for
+seeds 21 and 42). It also regenerates the seed-7 comparison with a direct
+paired-method bootstrap.
+
+The final decision is written to:
+
+```text
+outputs/reve_consistency_comparison_multiseed/aggregate_method_summary.json
+```
+
+Interpret `rule_loss_evidence_status` as follows:
+
+- `supported`: every consistency run passes the recovery/clean gate and the
+  hierarchical 95% CI for its recall-gap advantage over augmentation is above
+  zero.
+- `promising_but_inconclusive`: the mean advantage is positive, but its CI
+  crosses zero.
+- `not_supported`: the consistency objective fails the gate or has no positive
+  mean advantage. In this case, attribute robustness to multi-view
+  augmentation rather than the rule loss.
+
+After the run, commit or send back the six new method run directories, the
+three per-seed comparison directories, and
+`outputs/reve_consistency_comparison_multiseed/`. Do not run a consistency
+weight sweep until this confirmation is interpreted.
+
 ## Reading the output
 
 Each run creates:

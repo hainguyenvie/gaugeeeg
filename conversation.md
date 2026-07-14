@@ -158,3 +158,25 @@ the working hypothesis or paper direction.
   consistency loss is not a supported contribution.
 - Only after the seed-7 gate passes should seeds 21/42 and reference-plus-montage
   experiments be run.
+
+## 2026-07-14 — Seed-7 result and multi-seed confirmation decision
+
+- Both seed-7 methods passed the predeclared gate. Multi-view CE reduced the
+  held-out-Cz left-fist recall gap from 0.2217 to 0.1197; rule consistency
+  reduced it to 0.0976. CAR BAcc increased rather than decreased.
+- Rule consistency reduced the Cz BAcc gap from 0.0603 to 0.0107, compared with
+  0.0235 for multi-view CE. Its own subject bootstrap no longer detected a
+  nonzero Cz degradation.
+- The direct rule-versus-augmentation recall-gap advantage was only 0.0222 in
+  seed 7. A post-hoc paired subject bootstrap gave a 95% interval of roughly
+  [-0.020, 0.067], so one seed does not support a superiority claim.
+- Next action: train only the multi-view CE and rule-consistency probes for
+  seeds 21/42, then use a hierarchical bootstrap over probe seeds and paired
+  subjects. Do not run a lambda sweep yet.
+- Decision rule: call the rule term `supported` only when every consistency run
+  passes the recovery/clean gate and the hierarchical 95% interval for direct
+  recall-gap recovery is above zero. Otherwise report
+  `promising_but_inconclusive` or attribute recovery to augmentation.
+- Scope note: the encoder remains frozen. This stage tests a rule-informed
+  robust readout, not yet encoder-level representation learning. Harder
+  missing-channel/montage experiments follow only after method confirmation.

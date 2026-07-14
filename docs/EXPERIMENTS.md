@@ -11,6 +11,9 @@ sanity check fails.
 | E2 | Measure frozen REVE sensitivity | `gaugeeeg run --config configs/pilot.yaml --encoder reve --device cuda --output-dir outputs/pilot_reve` | Pilot REVE metrics and drift |
 | E3 | Confirm on official split | `gaugeeeg run --config configs/full_physionetmi.yaml --encoder reve --device cuda` | Full-split metrics |
 | E4 | Repeat and extend | change seeds; add bipolar/missing-channel views | Confidence intervals and harder benchmark |
+| E5 | Audit class-conditional bias | `gaugeeeg class-bias-audit ...` | Stable class-specific recall shifts |
+| E6a | Held-out-Cz method screen | seed-7 multi-view CE and rule consistency | Predeclared pilot gate |
+| E6b | Multi-seed method confirmation | `make consistency-multiseed` | Hierarchical paired-method bootstrap |
 
 ## E0 acceptance
 
@@ -47,3 +50,18 @@ outputs/pilot_reve/resolved_config.yaml
 ```
 
 Do not send downloaded EDF files or Hugging Face model weights.
+
+## E6b interpretation
+
+E6b holds Cz out of probe training and validation. It trains CAR/Pz/FCz probes
+with ordinary multi-view cross-entropy and with the same loss plus
+Jensen-Shannon consistency. Seeds 7, 21, and 42 share `reference_seed=7`, the
+subject split, frozen REVE features, and all optimizer settings except the
+probe initialization/data order seed.
+
+The final comparison resamples both probe seeds and paired test subjects. A
+rule-loss contribution is supported only when all consistency runs pass the
+30% recall-gap recovery and 1-point clean-loss gates and the hierarchical 95%
+CI for `multi_view_ce gap - rule_consistency gap` is above zero. A CI that
+crosses zero is explicitly inconclusive even when the point estimate is
+positive.
