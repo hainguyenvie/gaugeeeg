@@ -1,0 +1,4 @@
+method,run_dir,car_balanced_accuracy,target_balanced_accuracy,balanced_accuracy_gap,target_class_recall_gap,balanced_accuracy_gap_relative_reduction,target_class_recall_gap_relative_reduction,clean_balanced_accuracy_change
+car_only,outputs/reve_statistical_audit_s42,0.5883246386256558,0.5645022950012951,0.023822343624360642,0.2017738359201774,0.0,0.0,0.0
+multi_view_ce,outputs/reve_multiview_ce_s42,0.5880629936049866,0.5878509524957328,0.00021204110925376884,0.08647450110864752,0.9910990659610444,0.5714285714285711,-0.0002616450206691656
+rule_consistency,outputs/reve_rule_consistency_s42,0.5864501844159218,0.5968366718667033,-0.010386487450781523,0.07538802660753885,1.435997717712389,0.6263736263736261,-0.0018744542097339778

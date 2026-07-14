@@ -10,10 +10,10 @@
   "consistency_passes": true,
   "consistency_beats_augmentation_on_primary": true,
   "paired_primary_improvement": {
-    "point_estimate": 0.022172949002217335,
-    "ci_lower": -0.020089285714285754,
-    "ci_upper": 0.06889080459770107,
-    "probability_improvement_positive": 0.833,
+    "point_estimate": 0.011086474501108667,
+    "ci_lower": -0.009049773755656187,
+    "ci_upper": 0.030973451327433676,
+    "probability_improvement_positive": 0.8454,
     "ci_excludes_zero": false
   },
   "interpretation_rule": "A seed-level direction is exploratory. Claim rule-loss value only after the multi-seed hierarchical bootstrap excludes zero in favor of consistency."

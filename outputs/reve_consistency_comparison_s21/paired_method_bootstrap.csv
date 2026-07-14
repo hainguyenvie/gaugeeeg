@@ -1,0 +1,5 @@
+metric,positive_means,point_estimate,bootstrap_mean,ci_lower,ci_upper,probability_improvement_positive,ci_excludes_zero,n_subjects,n_probe_seeds,n_resamples,confidence
+target_class_recall_gap_recovery,rule_consistency_better_than_multi_view_ce,0.04212860310421285,0.04211460664259639,0.017817371937639322,0.0699774266365688,1.0,True,20,1,10000,0.95
+balanced_accuracy_gap_recovery,rule_consistency_better_than_multi_view_ce,0.004949603671949743,0.004859557205145259,-0.016361433081691672,0.02621191217732981,0.6765,False,20,1,10000,0.95
+clean_balanced_accuracy_gain,rule_consistency_better_than_multi_view_ce,-0.004779583137395793,-0.00474118959354632,-0.0247638639452779,0.015850881602658663,0.3199,False,20,1,10000,0.95
+target_balanced_accuracy_gain,rule_consistency_better_than_multi_view_ce,0.0001700205345539496,0.00011836761159893739,-0.020250905515576508,0.019660860226695772,0.5031,False,20,1,10000,0.95
