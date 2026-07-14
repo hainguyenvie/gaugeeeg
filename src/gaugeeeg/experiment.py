@@ -433,11 +433,14 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         pd.DataFrame(subject_rows).to_csv(output_dir / "subject_metrics.csv", index=False)
     if bootstrap_rows:
         pd.DataFrame(bootstrap_rows).to_csv(output_dir / "paired_subject_bootstrap.csv", index=False)
+    car_rows = results.loc[results["test_view"].str.lower() == "car"]
+    if car_rows.empty:
+        raise RuntimeError("Clean gate requires a CAR test view")
+    # Runs that sweep a defense without an undefended arm (e.g. defenses=[car_canonicalize])
+    # have no "none" row, so score the gate against the defense the run actually used.
+    undefended = car_rows.loc[car_rows["defense"] == "none"]
     clean_bacc = float(
-        results.loc[
-            (results["defense"] == "none") & (results["test_view"].str.lower() == "car"),
-            "balanced_accuracy",
-        ].iloc[0]
+        (undefended if not undefended.empty else car_rows)["balanced_accuracy"].iloc[0]
     )
     gate_threshold = float(experiment.get("clean_gate_min_balanced_accuracy", 0.0))
     non_car = results[results["test_view"].str.lower() != "car"]
