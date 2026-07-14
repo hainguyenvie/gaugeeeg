@@ -14,6 +14,7 @@ sanity check fails.
 | E5 | Audit class-conditional bias | `gaugeeeg class-bias-audit ...` | Stable class-specific recall shifts |
 | E6a | Held-out-Cz method screen | seed-7 multi-view CE and rule consistency | Predeclared pilot gate |
 | E6b | Multi-seed method confirmation | `make consistency-multiseed` | Hierarchical paired-method bootstrap |
+| E6c | Validation-only lambda ablation | `make consistency-lambda-ablation` | Selected λ and held-out-Cz evidence |
 
 ## E0 acceptance
 
@@ -65,3 +66,14 @@ rule-loss contribution is supported only when all consistency runs pass the
 CI for `multi_view_ce gap - rule_consistency gap` is above zero. A CI that
 crosses zero is explicitly inconclusive even when the point estimate is
 positive.
+
+## E6c selection protocol
+
+- Candidate weights: `0, 0.3, 1, 3, 10`; zero denotes multi-view CE.
+- Select one global weight using only mean validation BAcc over CAR/Pz/FCz and
+  seeds 7/21/42. Break an exact tie toward the smaller weight.
+- Cz remains held out from both training and selection.
+- After selection, compare the selected weight with lambda zero using the same
+  hierarchical seed-and-subject bootstrap as E6b.
+- The full test grid is an ablation table, not a second opportunity to choose
+  the weight. Do not report a post-hoc best-Cz lambda as the proposed method.

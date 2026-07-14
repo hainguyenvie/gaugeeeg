@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import balanced_accuracy_score
 
-
 PRIMARY_REDUCTION_THRESHOLD = 0.30
 MAXIMUM_CLEAN_BACC_DROP = 0.01
 

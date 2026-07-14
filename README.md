@@ -256,6 +256,42 @@ three per-seed comparison directories, and
 `outputs/reve_consistency_comparison_multiseed/`. Do not run a consistency
 weight sweep until this confirmation is interpreted.
 
+## Validation-only consistency-weight ablation
+
+The three-seed confirmation was directionally stable but statistically
+inconclusive: consistency beat augmentation on the primary metric in all three
+seeds, while the hierarchical 95% CI narrowly crossed zero. The next stage
+tests whether `lambda=1` underweights the rule term without tuning on Cz.
+
+```bash
+git pull
+source .venv/bin/activate
+make consistency-lambda-ablation
+```
+
+The candidate grid is `lambda in {0, 0.3, 1, 3, 10}`. Lambda zero is the
+existing multi-view CE run and lambda one is the existing consistency run, so
+the script trains only nine new probes (`0.3/3/10 x seeds 7/21/42`). Frozen
+REVE features are reused and `--force-recompute` is never passed.
+
+Selection is test-blind: lambda is chosen by mean validation balanced accuracy
+across CAR/Pz/FCz and the three probe seeds, with the smaller lambda breaking
+an exact tie. Only after that choice is fixed does the analyzer read held-out
+Cz predictions and run the hierarchical paired bootstrap. Test results for
+the complete grid are saved as transparent ablations and must not be used to
+reselect lambda.
+
+The primary output is:
+
+```text
+outputs/reve_consistency_lambda_ablation/lambda_ablation_summary.json
+```
+
+Send back or commit the nine `reve_rule_consistency_lam*_s*` directories and
+`outputs/reve_consistency_lambda_ablation/`. If validation selects lambda zero,
+the rule loss is not supported. If it selects a positive lambda, interpret only
+the nested `selected_vs_augmentation` evidence, not the best-looking Cz row.
+
 ## Reading the output
 
 Each run creates:

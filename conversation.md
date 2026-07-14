@@ -180,3 +180,38 @@ the working hypothesis or paper direction.
 - Scope note: the encoder remains frozen. This stage tests a rule-informed
   robust readout, not yet encoder-level representation learning. Harder
   missing-channel/montage experiments follow only after method confirmation.
+
+## 2026-07-14 — Multi-seed consistency result
+
+- Rule consistency passed the predeclared recovery/clean gate in all three
+  probe seeds and beat multi-view CE on the held-out-Cz left-fist recall gap in
+  all three: improvements were 0.0222, 0.0421, and 0.0111.
+- Mean left-fist recall gaps were 0.2069 for CAR-only, 0.0976 for multi-view CE,
+  and 0.0724 for rule consistency. Mean Cz BAcc gaps were 0.0352, 0.0107, and
+  0.0013, respectively.
+- The direct hierarchical recall-gap improvement was 0.0251 with 95% interval
+  [-0.0022, 0.0547] and probability of a positive improvement 0.9649. Under the
+  predeclared two-sided-CI decision rule, evidence is
+  `promising_but_inconclusive`, not `supported`.
+- A post-hoc subject audit found positive mean recovery for 12/20 subjects,
+  zero for 5/20, and negative recovery for 3/20; the median was approximately
+  0.0211. The effect is not explained by one subject, but this audit is
+  supporting rather than confirmatory evidence.
+
+## 2026-07-14 — Predeclared lambda-ablation protocol
+
+- Motivation: at selected epochs, the lambda-one consistency term contributes
+  only a modest fraction of the total optimization objective; the weak direct
+  effect may reflect underweighting rather than a false rule.
+- Candidate grid: `lambda = 0, 0.3, 1, 3, 10` over probe seeds 7/21/42. Lambda
+  zero is ordinary multi-view CE; existing lambda-zero and lambda-one runs are
+  reused, and only nine new probes are trained.
+- One global lambda is selected using mean validation BAcc across CAR/Pz/FCz
+  and all three seeds. An exact tie selects the smaller lambda. Cz must not be
+  read during selection.
+- After lambda is frozen, compare it with lambda zero on Cz using the
+  hierarchical seed-and-subject bootstrap. The complete Cz grid is reported
+  only as an ablation and cannot be used to reselect lambda.
+- If validation selects zero, abandon the rule-loss claim. If it selects a
+  positive lambda but the held-out comparison remains inconclusive, carry the
+  result only as motivation into the harder reference-plus-montage benchmark.

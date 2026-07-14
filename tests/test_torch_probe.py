@@ -68,6 +68,8 @@ class TorchProbeTests(unittest.TestCase):
         )
         self.assertGreaterEqual(result.validation_balanced_accuracy, 0.9)
         self.assertIn("train_consistency_loss", result.history[0])
+        self.assertIn("validation_consistency_loss", result.history[0])
+        self.assertGreaterEqual(result.validation_consistency_loss, 0.0)
 
 
 if __name__ == "__main__":

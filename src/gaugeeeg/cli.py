@@ -134,6 +134,23 @@ def _aggregate_methods_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _lambda_ablation_command(args: argparse.Namespace) -> None:
+    from .lambda_ablation import analyze_lambda_ablation
+
+    result = analyze_lambda_ablation(
+        args.baselines,
+        args.runs,
+        args.output_dir,
+        expected_lambdas=args.expected_lambdas,
+        target_view=args.target_view,
+        target_class=args.target_class,
+        n_resamples=args.bootstrap_resamples,
+        confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -211,6 +228,28 @@ def build_parser() -> argparse.ArgumentParser:
     aggregate_methods.add_argument("--bootstrap-confidence", type=float, default=0.95)
     aggregate_methods.add_argument("--bootstrap-seed", type=int, default=20260714)
     aggregate_methods.set_defaults(handler=_aggregate_methods_command)
+
+    lambda_ablation = subparsers.add_parser(
+        "lambda-ablation",
+        help="Select consistency weight on validation and audit held-out performance",
+    )
+    lambda_ablation.add_argument("--baselines", nargs="+", required=True)
+    lambda_ablation.add_argument("--runs", nargs="+", required=True)
+    lambda_ablation.add_argument(
+        "--expected-lambdas",
+        nargs="+",
+        type=float,
+        default=[0.0, 0.3, 1.0, 3.0, 10.0],
+    )
+    lambda_ablation.add_argument("--target-view", default="cz")
+    lambda_ablation.add_argument("--target-class", type=int, default=0)
+    lambda_ablation.add_argument(
+        "--output-dir", default="outputs/reve_consistency_lambda_ablation"
+    )
+    lambda_ablation.add_argument("--bootstrap-resamples", type=int, default=10000)
+    lambda_ablation.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    lambda_ablation.add_argument("--bootstrap-seed", type=int, default=20260714)
+    lambda_ablation.set_defaults(handler=_lambda_ablation_command)
     return parser
 
 

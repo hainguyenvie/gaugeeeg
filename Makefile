@@ -1,4 +1,4 @@
-.PHONY: install test synthetic pilot consistency-multiseed
+.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation
 
 install:
 	python -m pip install -e ".[data,dev]"
@@ -14,3 +14,6 @@ pilot:
 
 consistency-multiseed:
 	bash scripts/run_consistency_multiseed.sh
+
+consistency-lambda-ablation:
+	bash scripts/run_consistency_lambda_ablation.sh

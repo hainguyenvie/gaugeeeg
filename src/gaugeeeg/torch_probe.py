@@ -14,6 +14,8 @@ class TorchProbeResult:
     model: TorchTokenPredictor
     selected_epoch: int
     validation_balanced_accuracy: float
+    validation_consistency_loss: float
+    validation_prediction_disagreement: float
     history: tuple[dict[str, float], ...]
 
 
@@ -173,6 +175,8 @@ def fit_reve_token_probe(
     global_step = 0
     best_score = -1.0
     best_epoch = 0
+    best_consistency = float("nan")
+    best_disagreement = float("nan")
     best_state = None
     stale_epochs = 0
     history: list[dict[str, float]] = []
@@ -215,10 +219,29 @@ def fit_reve_token_probe(
             epoch_consistency += float(consistency_loss.item()) * labels.shape[0]
             global_step += 1
 
+        validation_probabilities = np.stack(
+            [predictor.predict_proba(val_x[:, view_index]) for view_index in range(val_x.shape[1])],
+            axis=1,
+        )
+        validation_predictions = validation_probabilities.argmax(axis=-1)
         validation_scores = [
-            float(balanced_accuracy_score(val_y, predictor.predict(val_x[:, view_index])))
+            float(balanced_accuracy_score(val_y, validation_predictions[:, view_index]))
             for view_index in range(val_x.shape[1])
         ]
+        clipped_probability = np.clip(validation_probabilities, 1e-8, 1.0)
+        mean_probability = np.clip(clipped_probability.mean(axis=1, keepdims=True), 1e-8, 1.0)
+        validation_consistency = float(
+            np.mean(
+                np.sum(
+                    clipped_probability
+                    * (np.log(clipped_probability) - np.log(mean_probability)),
+                    axis=-1,
+                )
+            )
+        )
+        validation_disagreement = float(
+            np.mean(np.any(validation_predictions != validation_predictions[:, :1], axis=1))
+        )
         clean_score = validation_scores[0]
         score = float(np.mean(validation_scores))
         if epoch > warmup_epochs:
@@ -232,6 +255,8 @@ def fit_reve_token_probe(
                 "train_consistency_loss": float(epoch_consistency / train_y.size),
                 "validation_car_balanced_accuracy": clean_score,
                 "validation_balanced_accuracy": score,
+                "validation_consistency_loss": validation_consistency,
+                "validation_prediction_disagreement": validation_disagreement,
                 "learning_rate": float(optimizer.param_groups[0]["lr"]),
             }
         )
@@ -242,6 +267,8 @@ def fit_reve_token_probe(
         if score > best_score:
             best_score = score
             best_epoch = epoch
+            best_consistency = validation_consistency
+            best_disagreement = validation_disagreement
             best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
             stale_epochs = 0
         else:
@@ -253,4 +280,11 @@ def fit_reve_token_probe(
     if best_state is None:
         raise RuntimeError("REVE token probe did not produce a checkpoint")
     model.load_state_dict(best_state)
-    return TorchProbeResult(predictor, best_epoch, best_score, tuple(history))
+    return TorchProbeResult(
+        predictor,
+        best_epoch,
+        best_score,
+        best_consistency,
+        best_disagreement,
+        tuple(history),
+    )

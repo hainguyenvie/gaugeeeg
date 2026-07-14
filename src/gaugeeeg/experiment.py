@@ -196,6 +196,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         probe_name = str(experiment.get("probe", "sklearn_logreg")).casefold()
         selected_c = float("nan")
         selected_epoch = 0
+        validation_consistency_loss = float("nan")
+        validation_prediction_disagreement = float("nan")
         if probe_name == "sklearn_logreg":
             if len(training_views) != 1:
                 raise ValueError("sklearn_logreg does not support aligned multi-view training")
@@ -240,6 +242,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             predictor = probe.model
             selected_epoch = probe.selected_epoch
             validation_score = probe.validation_balanced_accuracy
+            validation_consistency_loss = probe.validation_consistency_loss
+            validation_prediction_disagreement = probe.validation_prediction_disagreement
             pd.DataFrame(probe.history).to_csv(output_dir / f"probe_history_{defense}.csv", index=False)
 
             try:
@@ -250,6 +254,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                         "model_state_dict": predictor.module.state_dict(),
                         "selected_epoch": selected_epoch,
                         "validation_balanced_accuracy": validation_score,
+                        "validation_consistency_loss": validation_consistency_loss,
+                        "validation_prediction_disagreement": validation_prediction_disagreement,
                         "probe": probe_name,
                         "probe_seed": probe_seed,
                         "reference_seed": reference_seed,
@@ -335,6 +341,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 "selected_c": selected_c,
                 "selected_epoch": selected_epoch,
                 "validation_balanced_accuracy": validation_score,
+                "validation_consistency_loss": validation_consistency_loss,
+                "validation_prediction_disagreement": validation_prediction_disagreement,
                 **metrics,
                 **drift,
                 "balanced_accuracy_gap_from_car": (
@@ -449,6 +457,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "probe_objective": probe_objective,
         "training_views": training_views,
         "consistency_weight": consistency_weight,
+        "validation_balanced_accuracy": validation_score,
+        "validation_consistency_loss": validation_consistency_loss,
+        "validation_prediction_disagreement": validation_prediction_disagreement,
         "n_trials": int(dataset.y.size),
         "n_channels": len(dataset.channel_names),
         "sfreq": dataset.sfreq,
