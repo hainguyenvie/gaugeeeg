@@ -26,6 +26,9 @@ def _run_command(args: argparse.Namespace) -> None:
         reference_seed=args.reference_seed,
         probe_objective=args.probe_objective,
         consistency_weight=args.consistency_weight,
+        training_views=args.training_views,
+        test_views=args.test_views,
+        defenses=args.defenses,
     )
     run_experiment(config)
 
@@ -151,6 +154,25 @@ def _lambda_ablation_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _montage_screen_command(args: argparse.Namespace) -> None:
+    from .montage_screen import analyze_montage_screen
+
+    result = analyze_montage_screen(
+        args.car_only,
+        args.canonical,
+        args.augmentation,
+        args.consistency,
+        args.output_dir,
+        primary_view=args.primary_view,
+        target_class=args.target_class,
+        selected_lambda=args.selected_lambda,
+        n_resamples=args.bootstrap_resamples,
+        confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -168,6 +190,9 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["car_only", "multi_view_ce", "rule_consistency"],
     )
     run.add_argument("--consistency-weight", type=float)
+    run.add_argument("--training-views", nargs="+", help="Override aligned train/validation views")
+    run.add_argument("--test-views", nargs="+", help="Override evaluation observation views")
+    run.add_argument("--defenses", nargs="+", help="Override preprocessing defenses")
     run.set_defaults(handler=_run_command)
 
     download = subparsers.add_parser("download", help="Download and cache the configured dataset")
@@ -250,6 +275,23 @@ def build_parser() -> argparse.ArgumentParser:
     lambda_ablation.add_argument("--bootstrap-confidence", type=float, default=0.95)
     lambda_ablation.add_argument("--bootstrap-seed", type=int, default=20260714)
     lambda_ablation.set_defaults(handler=_lambda_ablation_command)
+
+    montage_screen = subparsers.add_parser(
+        "montage-screen",
+        help="Analyze the fixed reference-plus-sparse-montage feasibility screen",
+    )
+    montage_screen.add_argument("--car-only", required=True)
+    montage_screen.add_argument("--canonical", required=True)
+    montage_screen.add_argument("--augmentation", required=True)
+    montage_screen.add_argument("--consistency", required=True)
+    montage_screen.add_argument("--primary-view", default="sparse16@cz")
+    montage_screen.add_argument("--target-class", type=int, default=0)
+    montage_screen.add_argument("--selected-lambda", type=float, default=10.0)
+    montage_screen.add_argument("--output-dir", default="outputs/reve_montage_screen_s7")
+    montage_screen.add_argument("--bootstrap-resamples", type=int, default=10000)
+    montage_screen.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    montage_screen.add_argument("--bootstrap-seed", type=int, default=20260714)
+    montage_screen.set_defaults(handler=_montage_screen_command)
     return parser
 
 

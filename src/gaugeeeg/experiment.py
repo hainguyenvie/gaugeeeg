@@ -19,7 +19,8 @@ from .metrics import (
     paired_subject_bootstrap_bacc_gap,
     representation_metrics,
 )
-from .referencing import apply_reference_view, common_average
+from .montage import apply_observation_view, observation_metadata
+from .referencing import common_average
 
 
 def _feature_key(
@@ -80,7 +81,7 @@ def _extract_features(
         with np.load(cache_path, allow_pickle=False) as cached:
             return cached["features"], cached["labels"]
 
-    referenced = apply_reference_view(subset.x_uv, subset.channel_names, view, seed=seed)
+    referenced = apply_observation_view(subset.x_uv, subset.channel_names, view, seed=seed)
     protected = _defend(referenced, defense)
     features = encoder.transform(protected, subset.channel_names, subset.sfreq)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -319,6 +320,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         for view in views:
             key = view.casefold()
             metrics = task_metrics[key]
+            view_metadata = observation_metadata(dataset.channel_names, view)
             drift = representation_metrics(
                 _drift_features(encoder, car_features),
                 _drift_features(encoder, test_features[key]),
@@ -332,6 +334,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 "train_view": train_view,
                 "training_views": "|".join(training_views),
                 "test_view": view,
+                **view_metadata,
                 "n_train": int(train_y.size),
                 "n_val": int(val_y.size),
                 "n_test": int(test_labels.size),
@@ -456,6 +459,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "strict_determinism": strict_determinism,
         "probe_objective": probe_objective,
         "training_views": training_views,
+        "test_observation_views": views,
         "consistency_weight": consistency_weight,
         "validation_balanced_accuracy": validation_score,
         "validation_consistency_loss": validation_consistency_loss,

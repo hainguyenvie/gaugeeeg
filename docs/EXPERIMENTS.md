@@ -15,6 +15,7 @@ sanity check fails.
 | E6a | Held-out-Cz method screen | seed-7 multi-view CE and rule consistency | Predeclared pilot gate |
 | E6b | Multi-seed method confirmation | `make consistency-multiseed` | Hierarchical paired-method bootstrap |
 | E6c | Validation-only lambda ablation | `make consistency-lambda-ablation` | Selected λ and held-out-Cz evidence |
+| E7a | Reference + sparse-montage screen | `make montage-screen` | Fixed seed-7 limitation screen |
 
 ## E0 acceptance
 
@@ -77,3 +78,20 @@ positive.
   hierarchical seed-and-subject bootstrap as E6b.
 - The full test grid is an ablation table, not a second opportunity to choose
   the weight. Do not report a post-hoc best-Cz lambda as the proposed method.
+
+## E7a sparse-montage protocol
+
+- Freeze `lambda=10` from E6c. Montage results cannot change that value.
+- Keep training full-montage and unchanged: CAR-only for the clean baseline;
+  CAR/Pz/FCz for multi-view CE and rule consistency.
+- Apply reference first, then zero-fill missing electrodes while retaining the
+  original 64-channel order. Evaluate nested 32/16/8 motor-centric montages and
+  asymmetric left/right motor-region drops.
+- Fix `sparse16@cz` as the primary view and left-fist as the target class before
+  reading results. All other rows diagnose severity and class asymmetry.
+- A CAR-only BAcc loss of at least 0.03 on the primary view establishes a useful
+  harder stressor. E7a is one-seed exploratory evidence; it cannot support a
+  final method claim.
+- If the stressor is hard, implement montage-aware training next. Do not spend
+  three-seed compute merely reconfirming that the unchanged full-montage method
+  fails. If the stressor is weak, revise the observation model first.

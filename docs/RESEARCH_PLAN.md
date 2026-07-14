@@ -79,6 +79,14 @@ no prior study has addressed this problem.
 Only item 1 and the exact baseline are implemented in v0.1. The learned method
 should be added only if the pilot establishes a meaningful failure mode.
 
+Current evidence has advanced beyond v0.1: a validation-selected prediction
+consistency loss improves held-out full-montage Cz robustness over ordinary
+multi-view augmentation. This remains a frozen-encoder robust readout. E7a now
+tests whether that method transfers to missing-channel observations, where the
+exact CAR positive control is algebraically insufficient. A positive E7a
+failure mode is the gate for a trainable montage-aware adapter or encoder-level
+objective.
+
 ## 6. Core hypotheses
 
 - **H1:** Frozen REVE embeddings and linear-probe performance change under

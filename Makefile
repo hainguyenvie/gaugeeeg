@@ -1,4 +1,4 @@
-.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation
+.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen
 
 install:
 	python -m pip install -e ".[data,dev]"
@@ -17,3 +17,6 @@ consistency-multiseed:
 
 consistency-lambda-ablation:
 	bash scripts/run_consistency_lambda_ablation.sh
+
+montage-screen:
+	bash scripts/run_montage_screen.sh

@@ -215,3 +215,35 @@ the working hypothesis or paper direction.
 - If validation selects zero, abandon the rule-loss claim. If it selects a
   positive lambda but the held-out comparison remains inconclusive, carry the
   result only as motivation into the harder reference-plus-montage benchmark.
+
+## 2026-07-14 — Validation-selected lambda result
+
+- Validation over CAR/Pz/FCz and seeds 7/21/42 selected lambda 10 without
+  reading held-out Cz.
+- Against multi-view CE, lambda 10 improved the held-out-Cz left-fist recall
+  gap by 0.0310. The hierarchical seed-and-subject 95% interval was
+  [0.0052, 0.0618], with probability of positive improvement 0.9888.
+- The advantage was positive in all three seeds. Target Cz BAcc increased by
+  0.0210 and clean CAR BAcc increased by 0.0185; their hierarchical intervals
+  also excluded zero.
+- Under the predeclared rule, the rule-loss evidence status is now `supported`.
+  Lambda 10 is the best candidate only within the declared grid; it lies at the
+  upper boundary and must not be called a global optimum.
+- This closes the ideal full-channel reference stage. The encoder is still
+  frozen, and CAR remains an exact solution for pure full-channel gauge shifts.
+
+## 2026-07-14 — Predeclared reference-plus-montage screen
+
+- Next limitation: the selected reference-consistency readout has never seen
+  missing electrodes, and exact CAR cannot recover signals that were not
+  observed.
+- E7a keeps lambda 10 and all training choices frozen. It evaluates CAR-only,
+  CAR canonicalization, multi-view CE, and rule consistency at seed 7.
+- OOD observations are nested motor-centric 32/16/8 channel masks under CAR
+  and Cz plus asymmetric left/right motor-region dropout. Reference is applied
+  before channels are zero-filled; channel order and tensor shape are retained.
+- The primary view is fixed as `sparse16@cz`, with left-fist as target class.
+  Other test rows are diagnostic and cannot be used to select another target.
+- If CAR-only loses at least 0.03 BAcc, proceed to montage-aware training. This
+  one-seed screen is designed to identify a method limitation, not to establish
+  a final superiority claim.

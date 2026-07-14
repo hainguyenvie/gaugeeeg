@@ -292,6 +292,45 @@ Send back or commit the nine `reve_rule_consistency_lam*_s*` directories and
 the rule loss is not supported. If it selects a positive lambda, interpret only
 the nested `selected_vs_augmentation` evidence, not the best-looking Cz row.
 
+## Reference-plus-sparse-montage feasibility screen
+
+Validation selected `lambda=10`, and its held-out-Cz advantage over ordinary
+multi-view CE passed the predeclared hierarchical bootstrap. The next screen
+asks whether that full-montage reference rule transfers when electrodes are
+also unobserved:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+make montage-screen
+```
+
+The runner first verifies that the preceding lambda summary exists, that
+lambda 10 was selected without the target view, and then evaluates four fixed
+seed-7 methods: CAR-only, CAR canonicalization, multi-view CE, and the selected
+rule-consistency probe. The OOD suite contains nested motor-centric 32/16/8
+channel observations under CAR and Cz plus left/right motor-region dropout.
+
+Sparse observations use the explicit convention `montage@reference`: apply
+the physical reference first, then zero-fill unobserved channels while keeping
+the original channel order. This lets the same frozen REVE encoder and token
+probe consume every paired trial. It does not reconstruct missing signals, and
+CAR canonicalization is no longer an exact inverse once channels are absent.
+
+The primary view is fixed as `sparse16@cz`; do not choose a different montage
+after reading the output. Interpret this one-seed stage only as a feasibility
+screen. The decision artifact is:
+
+```text
+outputs/reve_montage_screen_s7/montage_screen_summary.json
+```
+
+Commit the four `outputs/reve_montage_*_s7` run directories and
+`outputs/reve_montage_screen_s7/`. If the CAR-only primary BAcc gap is at least
+three points, the next stage should add montage-aware training rather than
+immediately repeating this unchanged method over more seeds.
+
 ## Reading the output
 
 Each run creates:

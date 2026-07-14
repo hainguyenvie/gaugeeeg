@@ -76,6 +76,9 @@ def with_overrides(
     reference_seed: int | None = None,
     probe_objective: str | None = None,
     consistency_weight: float | None = None,
+    training_views: list[str] | None = None,
+    test_views: list[str] | None = None,
+    defenses: list[str] | None = None,
 ) -> dict[str, Any]:
     result = deepcopy(config)
     experiment = result["experiment"]
@@ -95,6 +98,12 @@ def with_overrides(
         experiment["probe_objective"] = str(probe_objective)
     if consistency_weight is not None:
         experiment["consistency_weight"] = float(consistency_weight)
+    if training_views is not None:
+        experiment["training_views"] = [str(view) for view in training_views]
+    if test_views is not None:
+        experiment["test_views"] = [str(view) for view in test_views]
+    if defenses is not None:
+        experiment["defenses"] = [str(defense) for defense in defenses]
     validate_config(result)
     return result
 
