@@ -6,12 +6,10 @@ set -euo pipefail
 CONFIG="${CONFIG:-configs/reve_consistency_screen.yaml}"
 DEVICE="${DEVICE:-cuda}"
 
-if command -v gaugeeeg >/dev/null 2>&1; then
-  GAUGEEG=(gaugeeeg)
-else
-  export PYTHONPATH="src${PYTHONPATH:+:${PYTHONPATH}}"
-  GAUGEEG=(python -m gaugeeeg.cli)
-fi
+# Always execute the just-pulled source tree. This avoids accidentally using an
+# older non-editable GaugeEEG installation that happens to be on PATH.
+export PYTHONPATH="src${PYTHONPATH:+:${PYTHONPATH}}"
+GAUGEEG=(python -m gaugeeeg.cli)
 
 require_file() {
   if [[ ! -f "$1" ]]; then
