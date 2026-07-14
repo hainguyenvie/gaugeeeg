@@ -1,0 +1,23 @@
+{
+  "stage": "E7a sparse-montage feasibility screen",
+  "probe_seeds": [
+    7
+  ],
+  "primary_view": "sparse16@cz",
+  "target_class_index": 0,
+  "selected_consistency_lambda": 10.0,
+  "lambda_was_selected_before_montage_targets": true,
+  "missing_channel_policy": "zero-fill after physical re-referencing; preserve channel order",
+  "car_canonicalization_is_exact_for_sparse_views": false,
+  "hard_shift_threshold": 0.03,
+  "hard_shift_detected_on_primary": true,
+  "primary_car_only_balanced_accuracy_gap": 0.3207541359019275,
+  "primary_rule_vs_augmentation_target_bacc": {
+    "point_estimate": 0.0,
+    "ci_lower": 0.0,
+    "ci_upper": 0.0,
+    "probability_improvement_positive": 0.0
+  },
+  "next_decision": "Proceed to montage-aware training; this screen is one-seed exploratory evidence only.",
+  "interpretation_rule": "Do not tune lambda or select a different primary montage from these test rows. Use this screen to decide whether missing channels expose a limitation; any new montage-aware method requires validation-only selection and a later three-seed audit."
+}
