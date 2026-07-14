@@ -1,0 +1,16 @@
+probe_seed,lambda,probe_objective,run_dir,selected_epoch,validation_balanced_accuracy,validation_consistency_loss,validation_prediction_disagreement
+7,0.0,multi_view_ce,outputs/reve_multiview_ce_s7,17,0.5286737314422442,,
+21,0.0,multi_view_ce,outputs/reve_multiview_ce_s21,13,0.525648053325377,,
+42,0.0,multi_view_ce,outputs/reve_multiview_ce_s42,19,0.5204706670851669,,
+7,0.3,rule_consistency,outputs/reve_rule_consistency_lam0p3_s7,12,0.5242024213077018,0.0216786097735166,0.2312572087658592
+21,0.3,rule_consistency,outputs/reve_rule_consistency_lam0p3_s21,13,0.5268104772979935,0.0218986850231885,0.2139561707035755
+42,0.3,rule_consistency,outputs/reve_rule_consistency_lam0p3_s42,18,0.5230940424918331,0.0297326855361461,0.2393310265282583
+7,1.0,rule_consistency,outputs/reve_rule_consistency_s7,11,0.5245836865783137,,
+21,1.0,rule_consistency,outputs/reve_rule_consistency_s21,13,0.5283816544834555,,
+42,1.0,rule_consistency,outputs/reve_rule_consistency_s42,19,0.5271343623749877,,
+7,3.0,rule_consistency,outputs/reve_rule_consistency_lam3p0_s7,18,0.5278237136705209,0.0234530307352542,0.1995386389850057
+21,3.0,rule_consistency,outputs/reve_rule_consistency_lam3p0_s21,13,0.5260988715205605,0.0166840963065624,0.1776239907727797
+42,3.0,rule_consistency,outputs/reve_rule_consistency_lam3p0_s42,13,0.5273762632043442,0.0176210049539804,0.2035755478662053
+7,10.0,rule_consistency,outputs/reve_rule_consistency_lam10p0_s7,18,0.5362578537527972,0.0174610316753387,0.1782006920415225
+21,10.0,rule_consistency,outputs/reve_rule_consistency_lam10p0_s21,15,0.5357474742222176,0.0155498618260025,0.196078431372549
+42,10.0,rule_consistency,outputs/reve_rule_consistency_lam10p0_s42,18,0.538325915440769,0.0175974294543266,0.1983852364475201

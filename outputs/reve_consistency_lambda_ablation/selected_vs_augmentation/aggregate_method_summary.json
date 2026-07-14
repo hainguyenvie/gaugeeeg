@@ -1,0 +1,21 @@
+{
+  "probe_seeds": [
+    7,
+    21,
+    42
+  ],
+  "target_view": "cz",
+  "target_class_index": 0,
+  "bootstrap_unit": "probe seed and paired test subject",
+  "all_consistency_runs_pass_predeclared_gate": true,
+  "consistency_beats_augmentation_on_primary_every_seed": true,
+  "primary_hierarchical_bootstrap": {
+    "point_estimate": 0.03104212860310429,
+    "ci_lower": 0.00517283341635976,
+    "ci_upper": 0.06178232282865188,
+    "probability_improvement_positive": 0.9888,
+    "ci_excludes_zero": true
+  },
+  "rule_loss_evidence_status": "supported",
+  "decision_rule": "supported requires every consistency run to pass the predeclared recovery/clean gate and the hierarchical 95% CI for recall-gap recovery to be above zero; a positive point estimate with a crossing CI is promising_but_inconclusive."
+}
