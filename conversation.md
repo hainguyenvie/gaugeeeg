@@ -247,3 +247,34 @@ the working hypothesis or paper direction.
 - If CAR-only loses at least 0.03 BAcc, proceed to montage-aware training. This
   one-seed screen is designed to identify a method limitation, not to establish
   a final superiority claim.
+
+## 2026-07-14 — E7a result: zero-fill screen invalidated
+
+- The primary `sparse16@cz` view reduced CAR-only BAcc from 0.5708 to exactly
+  0.2500, but every method reached chance on the same view.
+- Prediction inspection showed an input-collapse signature: CAR-only predicted
+  one class for 99.9% of trials, while multi-view CE and lambda-10 consistency
+  predicted that class for 100%.
+- Sparse difficulty was non-monotonic, and lambda 10 had zero target-BAcc gain
+  over multi-view CE. Its left-fist recall-gap recovery was negative.
+- Macro-AUROC remained around 0.57--0.60 despite chance BAcc, indicating that
+  ranking information survived while the zero pattern shifted decision bias.
+- Decision: do not repeat E7a over more seeds and do not claim a genuine
+  missing-channel limitation from zero-filled inputs.
+
+## 2026-07-14 — E7b native-subset correction
+
+- Select the retained electrodes, reference within that native montage, and
+  pass only its signals and coordinates to REVE instead of retaining 64
+  positions filled with zeros.
+- The existing token-flattening probe cannot accept a variable token count.
+  E7b therefore uses REVE's released fixed-dimensional attention pooling and a
+  linear probe solely to validate the benchmark.
+- Train on full-montage CAR and evaluate native 32/16/8 subsets under CAR/Cz,
+  plus asymmetric region drops. Keep `native16@cz` as the primary view.
+- A usable benchmark must pass the clean gate, show at least a 0.03 primary
+  gap, remain at least 0.02 above chance, predict at least three classes, avoid
+  a dominant class above 95%, and have normalized prediction entropy >=0.30.
+- Lambda 10 is not evaluated in E7b because transplanting its fixed-width head
+  would change the method. Montage-aware variable-set learning begins only
+  after E7b validates the corrected stressor.

@@ -1,10 +1,9 @@
 """Deterministic sparse-montage observation operators.
 
-The operators in this module preserve the original channel axis so that a
-fixed frozen encoder and probe can be evaluated on exactly the same trials.
-Unobserved channels are zero-filled *after* applying the requested physical
-reference.  Zero fill is an explicit benchmark convention, not an attempt to
-reconstruct the missing voltage.
+Two explicit policies are available: legacy sparse views reference the full
+recording and then zero-fill unobserved channels, while ``native*`` views first
+select the acquired electrodes, reference within that retained montage, and
+pass only those signals and coordinates to the encoder.
 """
 
 from __future__ import annotations
@@ -47,6 +46,16 @@ class ObservationView:
     name: str
     reference: str
     montage: str
+    channel_policy: str
+
+
+NATIVE_MONTAGE_ALIASES = {
+    "native8": "sparse8",
+    "native16": "sparse16",
+    "native32": "sparse32",
+    "native_drop_left_motor": "drop_left_motor",
+    "native_drop_right_motor": "drop_right_motor",
+}
 
 
 def parse_observation_view(view: str) -> ObservationView:
@@ -56,14 +65,21 @@ def parse_observation_view(view: str) -> ObservationView:
     if not name:
         raise ValueError("Observation view must not be empty")
     if "@" not in name:
-        return ObservationView(name=name, reference=name, montage="full")
-    montage, reference = (part.strip().casefold() for part in name.split("@", maxsplit=1))
-    if not montage or not reference:
+        return ObservationView(name=name, reference=name, montage="full", channel_policy="full")
+    montage_key, reference = (part.strip().casefold() for part in name.split("@", maxsplit=1))
+    if not montage_key or not reference:
         raise ValueError(f"Invalid observation view {view!r}; expected montage@reference")
+    channel_policy = "remove" if montage_key in NATIVE_MONTAGE_ALIASES else "zero"
+    montage = NATIVE_MONTAGE_ALIASES.get(montage_key, montage_key)
     if montage not in SPARSE_MONTAGES and montage not in REGION_DROPS:
-        allowed = sorted([*SPARSE_MONTAGES, *REGION_DROPS])
+        allowed = sorted([*SPARSE_MONTAGES, *REGION_DROPS, *NATIVE_MONTAGE_ALIASES])
         raise ValueError(f"Unknown montage {montage!r}; expected one of {allowed}")
-    return ObservationView(name=name, reference=reference, montage=montage)
+    return ObservationView(
+        name=name,
+        reference=reference,
+        montage=montage,
+        channel_policy=channel_policy,
+    )
 
 
 def montage_keep_mask(channel_names: Sequence[str], montage: str) -> NDArray[np.bool_]:
@@ -114,13 +130,39 @@ def apply_observation_view(
     *,
     seed: int = 0,
 ) -> FloatArray:
-    """Apply reference first, then a deterministic observation mask."""
+    """Apply the observation policy and its physical reference."""
+
+    observed, _ = prepare_observation_view(x, channel_names, view, seed=seed)
+    return observed
+
+
+def prepare_observation_view(
+    x: ArrayLike,
+    channel_names: Sequence[str],
+    view: str,
+    *,
+    seed: int = 0,
+) -> tuple[FloatArray, tuple[str, ...]]:
+    """Return the observed signal and its aligned channel names."""
 
     specification = parse_observation_view(view)
-    referenced = apply_reference_view(x, channel_names, specification.reference, seed=seed)
+    names = tuple(str(name) for name in channel_names)
     if specification.montage == "full":
-        return referenced
-    return zero_fill_unobserved(referenced, channel_names, specification.montage)
+        referenced = apply_reference_view(x, names, specification.reference, seed=seed)
+        return referenced, names
+    mask = montage_keep_mask(names, specification.montage)
+    if specification.channel_policy == "remove":
+        observed_names = tuple(name for name, keep in zip(names, mask, strict=True) if keep)
+        observed = np.asarray(x)[..., mask, :]
+        referenced = apply_reference_view(
+            observed,
+            observed_names,
+            specification.reference,
+            seed=seed,
+        )
+        return referenced, observed_names
+    referenced = apply_reference_view(x, names, specification.reference, seed=seed)
+    return zero_fill_unobserved(referenced, names, specification.montage), names
 
 
 def observation_metadata(channel_names: Sequence[str], view: str) -> dict[str, object]:
@@ -131,5 +173,8 @@ def observation_metadata(channel_names: Sequence[str], view: str) -> dict[str, o
         "montage": specification.montage,
         "n_observed_channels": int(mask.sum()),
         "observed_channel_fraction": float(mask.mean()),
-        "missing_channel_fill": "none" if mask.all() else "zero",
+        "missing_channel_fill": (
+            "none" if mask.all() else "removed" if specification.channel_policy == "remove" else "zero"
+        ),
+        "channel_policy": specification.channel_policy,
     }

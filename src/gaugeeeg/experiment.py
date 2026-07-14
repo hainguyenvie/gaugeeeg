@@ -19,7 +19,7 @@ from .metrics import (
     paired_subject_bootstrap_bacc_gap,
     representation_metrics,
 )
-from .montage import apply_observation_view, observation_metadata
+from .montage import observation_metadata, parse_observation_view, prepare_observation_view
 from .referencing import common_average
 
 
@@ -81,9 +81,14 @@ def _extract_features(
         with np.load(cache_path, allow_pickle=False) as cached:
             return cached["features"], cached["labels"]
 
-    referenced = apply_observation_view(subset.x_uv, subset.channel_names, view, seed=seed)
+    referenced, observed_channel_names = prepare_observation_view(
+        subset.x_uv,
+        subset.channel_names,
+        view,
+        seed=seed,
+    )
     protected = _defend(referenced, defense)
-    features = encoder.transform(protected, subset.channel_names, subset.sfreq)
+    features = encoder.transform(protected, observed_channel_names, subset.sfreq)
     cache_dir.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(cache_path, features=features, labels=subset.y)
     return features, subset.y
@@ -144,6 +149,13 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     consistency_weight = float(experiment.get("consistency_weight", 0.0))
     views = [str(view) for view in experiment.get("test_views", ["car"])]
     defenses = [str(defense) for defense in experiment.get("defenses", ["none"])]
+    if any(parse_observation_view(view).channel_policy == "remove" for view in views):
+        if str(experiment.get("probe", "sklearn_logreg")).casefold() == "reve_token":
+            raise ValueError(
+                "Native channel-subset views change token count and cannot use the fixed-width "
+                "reve_token flattening head; use REVE attention/mean pooling with sklearn_logreg "
+                "or implement a variable-set probe."
+            )
 
     for defense in defenses:
         print(f"\n=== Encoder={encoder.name} | defense={defense} ===")

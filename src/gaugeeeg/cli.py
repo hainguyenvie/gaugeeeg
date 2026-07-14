@@ -173,6 +173,21 @@ def _montage_screen_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _native_montage_screen_command(args: argparse.Namespace) -> None:
+    from .native_montage_screen import analyze_native_montage_screen
+
+    result = analyze_native_montage_screen(
+        args.baseline,
+        args.canonical,
+        args.output_dir,
+        primary_view=args.primary_view,
+        n_resamples=args.bootstrap_resamples,
+        confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -292,6 +307,19 @@ def build_parser() -> argparse.ArgumentParser:
     montage_screen.add_argument("--bootstrap-confidence", type=float, default=0.95)
     montage_screen.add_argument("--bootstrap-seed", type=int, default=20260714)
     montage_screen.set_defaults(handler=_montage_screen_command)
+
+    native_screen = subparsers.add_parser(
+        "native-montage-screen",
+        help="Validate a native variable-channel REVE montage benchmark",
+    )
+    native_screen.add_argument("--baseline", required=True)
+    native_screen.add_argument("--canonical", required=True)
+    native_screen.add_argument("--primary-view", default="native16@cz")
+    native_screen.add_argument("--output-dir", default="outputs/reve_native_montage_screen_s7")
+    native_screen.add_argument("--bootstrap-resamples", type=int, default=10000)
+    native_screen.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    native_screen.add_argument("--bootstrap-seed", type=int, default=20260714)
+    native_screen.set_defaults(handler=_native_montage_screen_command)
     return parser
 
 

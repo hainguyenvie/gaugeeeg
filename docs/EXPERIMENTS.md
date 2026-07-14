@@ -16,6 +16,7 @@ sanity check fails.
 | E6b | Multi-seed method confirmation | `make consistency-multiseed` | Hierarchical paired-method bootstrap |
 | E6c | Validation-only lambda ablation | `make consistency-lambda-ablation` | Selected λ and held-out-Cz evidence |
 | E7a | Reference + sparse-montage screen | `make montage-screen` | Fixed seed-7 limitation screen |
+| E7b | Native channel-subset validity screen | `make native-montage-screen` | Corrected benchmark decision |
 
 ## E0 acceptance
 
@@ -95,3 +96,23 @@ positive.
 - If the stressor is hard, implement montage-aware training next. Do not spend
   three-seed compute merely reconfirming that the unchanged full-montage method
   fails. If the stressor is weak, revise the observation model first.
+
+## E7b correction after E7a collapse
+
+E7a reached chance because zero-filled channels created an avoidable OOD input
+pattern. E7b is a benchmark correction, not a new method result:
+
+- Select retained electrodes, apply the requested reference within that native
+  montage, and pass only its signals and coordinates to REVE; never zero-pad.
+- Use REVE attention pooling plus a linear probe so native 64/32/16/8-channel
+  inputs have one fixed feature dimension.
+- Train only on full-montage CAR. Evaluate native 32/16/8 subsets under CAR and
+  Cz plus native asymmetric motor-region drops.
+- Keep `native16@cz` as the primary target. Decompose its combined loss into a
+  montage-only drop and the additional within-montage reference drop.
+- Declare the benchmark usable only if clean BAcc is at least 0.45, primary loss
+  is at least 0.03, primary BAcc is at least 0.27, at least three classes are
+  predicted, normalized prediction entropy is at least 0.30, and no class gets
+  more than 95% of predictions.
+- Only after this gate passes should a variable-set montage-aware probe or
+  adapter be implemented and compared over repeated seeds.

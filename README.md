@@ -331,6 +331,38 @@ Commit the four `outputs/reve_montage_*_s7` run directories and
 three points, the next stage should add montage-aware training rather than
 immediately repeating this unchanged method over more seeds.
 
+## Corrected native channel-subset screen
+
+E7a confirmed that zero-filling missing electrodes is not a valid proxy for
+REVE's native arbitrary-layout interface: nearly every sparse condition
+collapsed to one predicted class. E7b removes each missing signal *and* its
+position before REVE, then uses the model's released attention pooling to keep
+the downstream feature dimension fixed:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+DEVICE=cuda make native-montage-screen
+```
+
+Use `DEVICE=cuda:1` if required. This run intentionally does not reuse the
+fixed-width token-flattening head or lambda 10: both assume a constant token
+count and therefore cannot test native subsets without changing the method.
+It first validates the benchmark using a full-montage CAR linear probe and a
+CAR-canonicalization control.
+
+The primary target remains fixed at 16 observed channels under Cz. A usable
+benchmark must pass the clean gate, lose at least 0.03 BAcc on the primary
+target, and avoid the E7a collapse signature: at least three predicted classes,
+normalized prediction entropy at least 0.30, largest predicted-class share at
+most 0.95, and primary BAcc at least 0.02 above chance. The decision is saved
+to:
+
+```text
+outputs/reve_native_montage_screen_s7/native_montage_screen_summary.json
+```
+
 ## Reading the output
 
 Each run creates:

@@ -7,6 +7,7 @@ from gaugeeeg.montage import (
     apply_observation_view,
     montage_keep_mask,
     observation_metadata,
+    prepare_observation_view,
     zero_fill_unobserved,
 )
 from gaugeeeg.referencing import common_average
@@ -50,6 +51,25 @@ class MontageTests(unittest.TestCase):
         self.assertEqual(metadata["reference_view"], "car")
         self.assertEqual(metadata["n_observed_channels"], 16)
         self.assertEqual(metadata["missing_channel_fill"], "zero")
+
+    def test_native_view_removes_channels_and_aligned_names(self):
+        observed, names = prepare_observation_view(self.x, self.names, "native16@cz")
+        mask = montage_keep_mask(self.names, "sparse16")
+        subset = self.x[..., mask, :]
+        self.assertEqual(observed.shape[-2], 16)
+        self.assertEqual(names, tuple(name for name, keep in zip(self.names, mask, strict=True) if keep))
+        expected = apply_observation_view(subset, names, "cz")
+        np.testing.assert_array_equal(observed, expected)
+        metadata = observation_metadata(self.names, "native16@cz")
+        self.assertEqual(metadata["missing_channel_fill"], "removed")
+        self.assertEqual(metadata["channel_policy"], "remove")
+
+    def test_native_car_is_computed_within_retained_montage(self):
+        native_car, names = prepare_observation_view(self.x, self.names, "native16@car")
+        native_cz, cz_names = prepare_observation_view(self.x, self.names, "native16@cz")
+        self.assertEqual(names, cz_names)
+        np.testing.assert_allclose(native_car.mean(axis=-2), 0.0, atol=1e-6)
+        np.testing.assert_allclose(common_average(native_cz), native_car, atol=1e-6)
 
     def test_unknown_montage_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Unknown montage"):
