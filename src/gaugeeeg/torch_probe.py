@@ -40,6 +40,11 @@ class TorchTokenPredictor:
                 chunks.append(self.module(batch).float().cpu().numpy())
         return np.concatenate(chunks, axis=0).astype(np.float32, copy=False)
 
+    def predict_logits(self, x: NDArray[np.floating]) -> NDArray[np.float32]:
+        """Return raw class logits for post-hoc calibration audits."""
+
+        return self._logits(x)
+
     def predict(self, x: NDArray[np.floating]) -> NDArray[np.int64]:
         return self._logits(x).argmax(axis=1).astype(np.int64)
 

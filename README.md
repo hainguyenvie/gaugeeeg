@@ -509,3 +509,31 @@ decisions from each research iteration.
 - PhysioNet EEGMMIDB files are available under the Open Data Commons
   Attribution License v1.0.
 - GaugeEEG code is released under the MIT License.
+
+## Validation-only calibration control
+
+E8 tests the alternative explanation raised by E7d/E7e: reference changes may
+move relative class margins while preserving most within-class ranking. It
+fits no parameters on test subjects. Temperature, class-bias, and vector
+scaling are fitted on subjects 71--89 and evaluated on subjects 90--109 under
+both target-view-specific and leave-one-view-out protocols:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+DEVICE=cuda make set-calibration-control
+```
+
+The runner requires the existing E7c q4 selection and E7e predictions. It
+reproduces the deterministic q4 experiment while saving raw validation/test
+logits, verifies identity predictions against E7e, then writes:
+
+```text
+outputs/reve_set_calibration_logits_q4_s7
+outputs/reve_set_calibration_control_s7
+```
+
+Push both directories. `calibration_summary.json` distinguishes an oracle
+known-view calibration result from leave-one-view-out generalization; scalar
+temperature is retained as an argmax-invariant NLL/ECE control.

@@ -1,4 +1,4 @@
-.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry
+.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control
 
 install:
 	python -m pip install -e ".[data,dev]"
@@ -32,3 +32,6 @@ set-reference-closure:
 
 set-reference-geometry:
 	bash scripts/run_reve_set_reference_geometry.sh
+
+set-calibration-control:
+	bash scripts/run_reve_set_calibration_control.sh

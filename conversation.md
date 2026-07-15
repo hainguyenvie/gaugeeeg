@@ -389,3 +389,31 @@ the working hypothesis or paper direction.
   Disagreement >=0.15 is supporting evidence only.
 - If this suite-level criterion fails, make montage robustness the main method
   and keep gauge consistency as an auxiliary regularizer.
+
+## 2026-07-15 — E7e result review and E8 calibration-control decision
+
+- E7e reproduced q4 CAR predictions exactly and supported the predeclared
+  joint gauge/montage scope. Native16 Pz changed BAcc from 0.3844 to 0.4205
+  and moved both-feet recall from 0.004 to 0.300; native32 Fz reduced BAcc
+  from 0.4900 to 0.4358.
+- Aggregate BAcc masked larger class redistribution. Native32 Pz changed 38.2%
+  of predictions while its aggregate BAcc moved only 0.0084; both-feet recall
+  rose from 0.327 to 0.680 as the three other recalls fell.
+- The user and assistant agreed not to jump directly to a representation loss.
+  Stable per-class ranking makes validation-only calibration the necessary
+  control before claiming a representation failure.
+- E8 therefore freezes q4 and the E7e suite, saves raw validation/test logits,
+  and compares identity, scalar temperature, class-bias, and vector scaling.
+  Target-view-specific fitting is explicitly labeled an oracle known-view
+  baseline; leave-one-view-out tests transfer to an unseen reference within a
+  fixed montage.
+- All calibration parameters are fitted only on validation subjects 71--89.
+  Test subjects 90--109 remain untouched until final evaluation, and E8 must
+  reproduce E7e identity predictions exactly before interpretation.
+- The predeclared explanatory gate requires at least 50% reduction in the
+  worst class-recall shift without more than 0.01 loss in worst native BAcc.
+  Class-bias correction is the primary method matched to the observed margin
+  shift; temperature is an argmax-invariant control and vector scaling is a
+  sensitivity analysis, so no method is selected from test results. The result
+  will determine whether to develop a calibration/readout method or proceed to
+  joint gauge/montage representation learning.

@@ -187,3 +187,35 @@ AUROC 0.615 and 0.681.
   trigger the joint-method decision.
 - If the criterion fails, develop montage robustness as the primary method and
   retain gauge consistency only as an auxiliary regularizer.
+
+## E8 validation-only calibration-control protocol
+
+- Freeze the E7c-selected q4 architecture, CAR-only training, splits, seeds,
+  preprocessing, and complete E7e native32/native16 reference suite.
+- Save raw logits for every validation and test view from the same fitted
+  checkpoint. Require validation subjects 71--89 and test subjects 90--109 to
+  be disjoint, and require E8 identity predictions to reproduce E7e exactly.
+- Fit scalar temperature, zero-sum class bias, and diagonal vector scaling by
+  validation NLL only. Class bias is the predeclared primary control because
+  E7d/E7e identified relative class-margin shifts; temperature is a negative
+  control and vector scaling is a sensitivity analysis. Test labels never
+  enter optimization or model choice.
+- Report every method under two protocols: target-view-specific calibration
+  and leave-one-view-out calibration fitted on the other references in the
+  same montage. The first is an oracle known-view baseline; only the second
+  tests unseen-reference transfer.
+- Temperature cannot change argmax and is therefore an NLL/ECE control. Bias
+  and vector scaling are the minimum baselines capable of moving multiclass
+  decision boundaries.
+- Report BAcc, worst-class recall, macro AUROC, NLL, 15-bin ECE, disagreement,
+  per-class recall/frequency/AUROC, fitted parameters, and subject-bootstrap
+  BAcc deltas.
+- Call calibration explanatory only if it reduces the suite's worst absolute
+  within-montage reference recall shift by at least 50% while reducing worst
+  native BAcc by no more than 0.01. This gate uses the predeclared class-bias
+  method for both protocols; no method or test view is selected after seeing
+  test performance.
+- If leave-one-view-out passes, prioritize a reference-generalizing calibration
+  or gauge-aware readout. If only target-view-specific calibration passes, it
+  remains a strong baseline but requires known-view labels. If neither passes,
+  proceed to joint gauge/montage representation learning.

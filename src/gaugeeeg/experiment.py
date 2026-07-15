@@ -110,6 +110,68 @@ def _drift_features(encoder: Encoder, features: np.ndarray) -> np.ndarray:
     return summarize(features)
 
 
+def _predict_outputs(
+    predictor,
+    features: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
+    """Predict once while retaining raw logits when the probe exposes them."""
+
+    predict_logits = getattr(predictor, "predict_logits", None)
+    if predict_logits is not None:
+        logits = np.asarray(predict_logits(features), dtype=np.float64)
+        if logits.ndim != 2:
+            raise RuntimeError(f"Expected two-dimensional logits, observed shape {logits.shape}")
+        shifted = logits - logits.max(axis=1, keepdims=True)
+        probability = np.exp(shifted)
+        probability /= probability.sum(axis=1, keepdims=True)
+        prediction = logits.argmax(axis=1).astype(np.int64)
+        return prediction, probability, logits
+
+    prediction = np.asarray(predictor.predict(features), dtype=np.int64)
+    try:
+        probability = np.asarray(predictor.predict_proba(features), dtype=np.float64)
+    except (AttributeError, ValueError):
+        probability = None
+    return prediction, probability, None
+
+
+def _prediction_frame(
+    *,
+    probe_seed: int,
+    reference_seed: int,
+    defense: str,
+    split: str,
+    view: str,
+    subjects: np.ndarray,
+    labels: np.ndarray,
+    predictions: np.ndarray,
+    probabilities: np.ndarray | None,
+    logits: np.ndarray | None,
+    label_names: tuple[str, ...],
+) -> pd.DataFrame:
+    frame = pd.DataFrame(
+        {
+            "probe_seed": probe_seed,
+            "reference_seed": reference_seed,
+            "defense": defense,
+            "split": split,
+            "test_view": view,
+            "trial_index": np.arange(labels.size),
+            "subject_id": subjects,
+            "y_true": labels,
+            "y_pred": predictions,
+            "correct": predictions == labels,
+        }
+    )
+    if probabilities is not None:
+        for class_index, class_name in enumerate(label_names):
+            frame[f"prob_{class_name}"] = probabilities[:, class_index]
+    if logits is not None:
+        for class_index, class_name in enumerate(label_names):
+            frame[f"logit_{class_name}"] = logits[:, class_index]
+    return frame
+
+
 def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     legacy_seed = int(config.get("seed", 7))
     data_config = config["data"]
@@ -139,6 +201,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     expected_classes = len(dataset.label_names)
     rows: list[dict[str, Any]] = []
     prediction_frames: list[pd.DataFrame] = []
+    validation_prediction_frames: list[pd.DataFrame] = []
     subject_rows: list[dict[str, Any]] = []
     bootstrap_rows: list[dict[str, Any]] = []
     train_view = str(experiment.get("train_view", "car"))
@@ -306,6 +369,51 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         else:
             raise ValueError(f"Unknown probe: {probe_name}")
 
+        if bool(experiment.get("save_validation_predictions", False)):
+            validation_feature_by_view = {
+                training_view.casefold(): features
+                for training_view, features in zip(training_views, val_features, strict=True)
+            }
+            validation_subjects = dataset.subset(splits["val"]).subjects
+            if validation_subjects.size != val_y.size:
+                raise RuntimeError("Validation subject metadata is not aligned with validation labels")
+            for view in views:
+                key = view.casefold()
+                if key not in validation_feature_by_view:
+                    features, labels = _extract_features(
+                        dataset,
+                        encoder=encoder,
+                        split_name="val",
+                        subject_ids=splits["val"],
+                        view=view,
+                        defense=defense,
+                        seed=reference_seed,
+                        cache_dir=feature_cache,
+                        force_recompute=force_recompute,
+                    )
+                    if not np.array_equal(val_y, labels):
+                        raise RuntimeError("Validation label order changed across reference views")
+                    validation_feature_by_view[key] = features
+                prediction, probability, logits = _predict_outputs(
+                    predictor,
+                    validation_feature_by_view[key],
+                )
+                validation_prediction_frames.append(
+                    _prediction_frame(
+                        probe_seed=probe_seed,
+                        reference_seed=reference_seed,
+                        defense=defense,
+                        split="validation",
+                        view=view,
+                        subjects=validation_subjects,
+                        labels=val_y,
+                        predictions=prediction,
+                        probabilities=probability,
+                        logits=logits,
+                        label_names=dataset.label_names,
+                    )
+                )
+
         test_features: dict[str, np.ndarray] = {}
         test_labels: np.ndarray | None = None
         for view in views:
@@ -336,14 +444,14 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
 
         predictions: dict[str, np.ndarray] = {}
         probabilities: dict[str, np.ndarray | None] = {}
+        logits_by_view: dict[str, np.ndarray | None] = {}
         task_metrics: dict[str, dict[str, float]] = {}
         for view in views:
             key = view.casefold()
-            predictions[key] = predictor.predict(test_features[key])
-            try:
-                probabilities[key] = predictor.predict_proba(test_features[key])
-            except (AttributeError, ValueError):
-                probabilities[key] = None
+            predictions[key], probabilities[key], logits_by_view[key] = _predict_outputs(
+                predictor,
+                test_features[key],
+            )
             task_metrics[key] = classification_metrics_from_predictions(
                 test_labels,
                 predictions[key],
@@ -391,24 +499,21 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             rows.append(row)
 
             if bool(experiment.get("save_predictions", False)):
-                prediction_frame = pd.DataFrame(
-                    {
-                        "probe_seed": probe_seed,
-                        "reference_seed": reference_seed,
-                        "defense": defense,
-                        "test_view": view,
-                        "trial_index": np.arange(test_labels.size),
-                        "subject_id": test_subjects,
-                        "y_true": test_labels,
-                        "y_pred": predictions[key],
-                        "correct": predictions[key] == test_labels,
-                    }
+                prediction_frames.append(
+                    _prediction_frame(
+                        probe_seed=probe_seed,
+                        reference_seed=reference_seed,
+                        defense=defense,
+                        split="test",
+                        view=view,
+                        subjects=test_subjects,
+                        labels=test_labels,
+                        predictions=predictions[key],
+                        probabilities=probabilities[key],
+                        logits=logits_by_view[key],
+                        label_names=dataset.label_names,
+                    )
                 )
-                probability = probabilities[key]
-                if probability is not None:
-                    for class_index, class_name in enumerate(dataset.label_names):
-                        prediction_frame[f"prob_{class_name}"] = probability[:, class_index]
-                prediction_frames.append(prediction_frame)
 
             for subject in np.unique(test_subjects):
                 mask = test_subjects == subject
@@ -465,6 +570,10 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         pd.concat(prediction_frames, ignore_index=True).to_csv(
             output_dir / "predictions.csv", index=False
         )
+    if validation_prediction_frames:
+        pd.concat(validation_prediction_frames, ignore_index=True).to_csv(
+            output_dir / "validation_predictions.csv", index=False
+        )
     if subject_rows:
         pd.DataFrame(subject_rows).to_csv(output_dir / "subject_metrics.csv", index=False)
     if bootstrap_rows:
@@ -519,6 +628,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "feature_cache_dir": str(feature_cache),
         "metrics_path": str(output_dir / "metrics.csv"),
         "predictions_path": str(output_dir / "predictions.csv") if prediction_frames else None,
+        "validation_predictions_path": (
+            str(output_dir / "validation_predictions.csv")
+            if validation_prediction_frames
+            else None
+        ),
         "subject_metrics_path": str(output_dir / "subject_metrics.csv"),
         "paired_subject_bootstrap_path": (
             str(output_dir / "paired_subject_bootstrap.csv") if bootstrap_rows else None

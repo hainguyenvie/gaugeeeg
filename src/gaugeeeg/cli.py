@@ -231,6 +231,24 @@ def _reference_geometry_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _calibration_control_command(args: argparse.Namespace) -> None:
+    from .calibration import analyze_calibration_controls
+
+    result = analyze_calibration_controls(
+        args.validation_predictions,
+        args.test_predictions,
+        args.output_dir,
+        baseline_predictions=args.baseline_predictions,
+        n_resamples=args.bootstrap_resamples,
+        confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+        l2=args.l2,
+        min_recall_shift_reduction=args.min_recall_shift_reduction,
+        max_worst_bacc_loss=args.max_worst_bacc_loss,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -400,6 +418,22 @@ def build_parser() -> argparse.ArgumentParser:
     geometry.add_argument("--bootstrap-confidence", type=float, default=0.95)
     geometry.add_argument("--bootstrap-seed", type=int, default=20260715)
     geometry.set_defaults(handler=_reference_geometry_command)
+
+    calibration = subparsers.add_parser(
+        "calibration-control",
+        help="Fit validation-only calibration baselines and evaluate held-out test logits",
+    )
+    calibration.add_argument("--validation-predictions", required=True)
+    calibration.add_argument("--test-predictions", required=True)
+    calibration.add_argument("--baseline-predictions")
+    calibration.add_argument("--output-dir", default="outputs/reve_set_calibration_control_s7")
+    calibration.add_argument("--bootstrap-resamples", type=int, default=10000)
+    calibration.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    calibration.add_argument("--bootstrap-seed", type=int, default=20260715)
+    calibration.add_argument("--l2", type=float, default=1e-4)
+    calibration.add_argument("--min-recall-shift-reduction", type=float, default=0.50)
+    calibration.add_argument("--max-worst-bacc-loss", type=float, default=0.01)
+    calibration.set_defaults(handler=_calibration_control_command)
     return parser
 
 
