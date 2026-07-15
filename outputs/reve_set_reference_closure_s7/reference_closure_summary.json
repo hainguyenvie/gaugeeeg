@@ -1,0 +1,54 @@
+{
+  "stage": "E7d q4 full-reference closure and class-conditional montage audit",
+  "selected_queries_frozen": 4,
+  "selection_source": "outputs/reve_set_head_selection_s7/set_head_selection.json",
+  "car_trials_reproduced": true,
+  "car_predictions_reproduced_exactly": true,
+  "full_reference_max_absolute_bacc_gap": 0.04524151942959109,
+  "full_reference_max_absolute_bacc_gap_view": "pz",
+  "full_reference_max_prediction_disagreement": 0.27121464226289516,
+  "full_reference_max_prediction_disagreement_view": "pz",
+  "full_reference_largest_absolute_class_recall_gap": 0.19733924611973397,
+  "full_reference_largest_shift_view": "pz",
+  "full_reference_largest_shift_class": "left_fist",
+  "native16_car_balanced_accuracy": 0.38443157166219133,
+  "native16_cz_balanced_accuracy": 0.38495884377244954,
+  "native16_car_vs_cz_prediction_disagreement": 0.115363283416528,
+  "native16_class_names": [
+    "left_fist",
+    "right_fist",
+    "both_fists",
+    "both_feet"
+  ],
+  "native16_car_class_recalls": [
+    0.7716186252771619,
+    0.7616926503340757,
+    0.0,
+    0.004415011037527594
+  ],
+  "native16_cz_class_recalls": [
+    0.7760532150776053,
+    0.7483296213808464,
+    0.0,
+    0.01545253863134658
+  ],
+  "native16_car_per_class_auroc": [
+    0.7735931985462943,
+    0.7513808792228256,
+    0.6145241028167857,
+    0.6809631264818903
+  ],
+  "n_predicted_classes": 4,
+  "prediction_entropy_normalized": 0.5159429510665364,
+  "effective_predicted_classes": 2.044695346791995,
+  "top_two_predicted_class_share": 0.9966722129783694,
+  "n_classes_with_recall_below_0_05": 2,
+  "functional_two_class_collapse": true,
+  "collapsed_class_indices": [
+    2,
+    3
+  ],
+  "collapsed_class_ranking_signal_preserved": true,
+  "audit_status": "closure_complete_functional_two_class_collapse_with_recoverable_ranking_signal",
+  "interpretation_rule": "E7c gates remain unchanged. Functional two-class collapse is a post-hoc diagnostic and a candidate method target, not a retrospective benchmark rejection rule."
+}
