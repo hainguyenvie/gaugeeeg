@@ -1,0 +1,4 @@
+metric,candidate,baseline,candidate_minus_baseline,ci_lower,ci_upper,confidence,n_resamples,n_repeats,n_reference_clusters
+target_bias_rmse,topology_shrinkage,prior_match,-0.11322379147057733,-0.15415913804774675,-0.06906853129948116,0.95,2000,20,32
+balanced_accuracy,topology_shrinkage,prior_match,0.002178239842132503,0.00018511520606883644,0.004142701795958414,0.95,2000,20,32
+max_class_recall_gap_to_car,topology_shrinkage,prior_match,-0.023786393633540372,-0.03449741874784334,-0.013622076378105589,0.95,2000,20,32
