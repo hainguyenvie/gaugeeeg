@@ -201,6 +201,21 @@ def _select_set_head_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _reference_closure_command(args: argparse.Namespace) -> None:
+    from .reference_closure import analyze_reference_closure
+
+    result = analyze_reference_closure(
+        args.full_run,
+        args.native_run,
+        args.selection,
+        args.output_dir,
+        n_resamples=args.bootstrap_resamples,
+        confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -344,6 +359,19 @@ def build_parser() -> argparse.ArgumentParser:
     set_head.add_argument("--clean-gate", type=float, default=0.45)
     set_head.add_argument("--output-dir", default="outputs/reve_set_head_selection_s7")
     set_head.set_defaults(handler=_select_set_head_command)
+
+    closure = subparsers.add_parser(
+        "reference-closure",
+        help="Audit q4 full-reference sensitivity and native class collapse",
+    )
+    closure.add_argument("--full-run", required=True)
+    closure.add_argument("--native-run", required=True)
+    closure.add_argument("--selection", required=True)
+    closure.add_argument("--output-dir", default="outputs/reve_set_reference_closure_s7")
+    closure.add_argument("--bootstrap-resamples", type=int, default=10000)
+    closure.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    closure.add_argument("--bootstrap-seed", type=int, default=20260715)
+    closure.set_defaults(handler=_reference_closure_command)
     return parser
 
 

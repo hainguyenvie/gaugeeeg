@@ -96,6 +96,14 @@ selection of a pooling-by-multihead-attention query count, followed by the same
 clean and noncollapse gates. Only a passing E7c result licenses montage-aware
 training and repeated-seed method comparisons.
 
+E7c subsequently passed: the q4 set readout reached 0.6112 clean CAR BAcc and
+0.3850 on native16@Cz, with a 0.2263 paired subject-level gap. The input no
+longer exhibits E7a's single-class collapse, but post-hoc inspection shows a
+functional two-class failure: both-fists and both-feet recall approach zero
+while their one-vs-rest AUROC remains above chance. E7d closes the missing
+full-reference comparison and quantifies this recoverable class-conditional
+decision bias before the learned montage method is introduced.
+
 ## 6. Core hypotheses
 
 - **H1:** Frozen REVE embeddings and linear-probe performance change under

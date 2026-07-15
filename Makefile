@@ -1,4 +1,4 @@
-.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen
+.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure
 
 install:
 	python -m pip install -e ".[data,dev]"
@@ -26,3 +26,6 @@ native-montage-screen:
 
 set-native-screen:
 	bash scripts/run_reve_set_native_screen.sh
+
+set-reference-closure:
+	bash scripts/run_reve_set_reference_closure.sh

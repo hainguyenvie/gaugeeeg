@@ -397,6 +397,37 @@ E7c is a readout-validity stage, not yet the proposed montage-aware method. A
 usable native benchmark is the prerequisite for the next comparison between
 full-CAR training, montage dropout, and joint gauge/montage consistency.
 
+E7c passed every predeclared gate at seed 7. Validation selected q4 with BAcc
+0.5595 and the clean CAR test reached 0.6112. The primary `native16@cz` BAcc
+was 0.3850, producing a subject-bootstrap gap of 0.2263 with 95% interval
+[0.1790, 0.2724]. Post-hoc prediction inspection found a more specific
+failure: the 16-channel model retained useful AUROC but almost never selected
+the bilateral classes.
+
+## q4 reference and class-conditional closure
+
+E7d adds the missing full-montage `Cz/Pz/FCz` rows for the frozen q4
+architecture and formalizes the class-collapse diagnostic. It does not select
+another query count or alter E7c's validity rule:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+DEVICE=cuda make set-reference-closure
+```
+
+The analyzer requires the new full-reference run to reproduce E7c's CAR
+predictions exactly. It then reports paired BAcc/disagreement, per-class
+recall/AUROC, subject-bootstrap recall intervals, effective predicted classes,
+and the native16 CAR-versus-Cz redistribution. Push these outputs after the
+run:
+
+```text
+outputs/reve_set_full_reference_q4_none_s7
+outputs/reve_set_reference_closure_s7
+```
+
 ## Reading the output
 
 Each run creates:

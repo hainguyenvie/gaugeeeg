@@ -314,3 +314,43 @@ the working hypothesis or paper direction.
   montage-aware representation learning.
 - Only a usable E7c benchmark advances to montage dropout plus joint
   gauge/montage consistency over seeds 7/21/42.
+
+## 2026-07-15 — E7c result: benchmark gate passed with a class-specific caveat
+
+- q4 was selected by CAR validation BAcc 0.5595, strictly above q8 at 0.5561
+  and q16 at 0.5548. The grid was close but not an exact tie, so the tie-break
+  did not determine the selection.
+- q4 reached clean full-CAR test BAcc 0.6112 and passed the 0.45 clean gate.
+  `native16@cz` reached 0.3850; its full-to-native gap was 0.2263 with paired
+  subject-bootstrap 95% CI [0.1790, 0.2724].
+- Native CAR BAcc decreased monotonically over 32/16/8 channels: 0.4900,
+  0.3844, and 0.3799. CAR canonicalization produced exactly equal CAR/Cz
+  results within each fixed native montage.
+- The predeclared noncollapse gate passed, but a post-hoc class audit found a
+  functional two-class collapse at native16. Under CAR, left/right-fist recall
+  was 0.772/0.762 while both-fists/both-feet recall was 0.000/0.004; 99.7% of
+  predictions went to the first two classes.
+- The collapsed classes retained AUROC 0.615 and 0.681, so ranking information
+  remains and the decision failure may be recoverable through montage-aware
+  training.
+- Native16 CAR and Cz had nearly equal BAcc but disagreed on 11.5% of trials;
+  native32 disagreement was 21.8%. Therefore, aggregate cancellation must not
+  be described as absence of a reference effect.
+- E7c remains a usable benchmark under its frozen rule. The functional-collapse
+  criterion is a diagnostic target, not a post-hoc replacement gate.
+
+## 2026-07-15 — E7d q4 reference/class-conditional closure protocol
+
+- Freeze the validation-selected q4 architecture and CAR-only training. Add
+  full-montage CAR/Cz/Pz/FCz evaluation without selecting anything from test.
+- Require exact reproduction of E7c CAR predictions before accepting the new
+  run, which prevents checkpoint variation from contaminating comparisons.
+- Quantify full-reference BAcc gaps, prediction disagreement, per-class recall,
+  per-class AUROC, and subject-bootstrap recall intervals.
+- Compare full CAR to native16 CAR for montage loss, and native16 CAR to
+  native16 Cz for the within-montage reference effect.
+- Flag functional two-class collapse when the top two classes receive >=98% of
+  predictions and at least two classes have recall <0.05. Preserve E7c's
+  original gate and label this criterion post-hoc.
+- If the collapsed classes retain AUROC >=0.55, proceed next to supervised
+  montage dropout and a joint gauge/montage representation-consistency method.

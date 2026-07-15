@@ -18,6 +18,7 @@ sanity check fails.
 | E7a | Reference + sparse-montage screen | `make montage-screen` | Fixed seed-7 limitation screen |
 | E7b | Native channel-subset validity screen | `make native-montage-screen` | Corrected benchmark decision |
 | E7c | Variable-set token readout gate | `make set-native-screen` | Clean gate, then corrected benchmark decision |
+| E7d | q4 reference/class closure | `make set-reference-closure` | Full-reference and functional-collapse audit |
 
 ## E0 acceptance
 
@@ -139,3 +140,26 @@ but the result cannot determine whether the montage stressor is useful.
   unchanged native suite under no defense and CAR canonicalization.
 - E7c validates a readout/benchmark pair. Montage dropout and joint
   gauge/montage consistency are deferred until the native benchmark is usable.
+
+E7c passed the declared benchmark gate at seed 7: q4 validation BAcc was
+0.5595, clean CAR was 0.6112, and `native16@cz` was 0.3850. The primary paired
+subject gap was 0.2263 with 95% CI [0.1790, 0.2724]. The query grid was close
+but not tied: q4 strictly exceeded q8 and q16 on validation.
+
+## E7d reference/class-conditional closure
+
+- Freeze q4 from E7c. Do not repeat query selection or use E7d to modify the
+  E7c benchmark gate.
+- Train the identical deterministic CAR-only q4 probe and add full-montage
+  CAR/Cz/Pz/FCz test views.
+- Require exact equality between its CAR predictions and E7c's native-run CAR
+  predictions before interpreting any comparison.
+- Audit prediction disagreement and class recall/AUROC for three contrasts:
+  full-CAR versus each full reference, full-CAR versus native16-CAR, and
+  native16-CAR versus native16-Cz.
+- Record functional two-class collapse when the two largest predicted classes
+  receive at least 98% of predictions and at least two classes have recall
+  below 0.05. This is a post-hoc method diagnostic, not retrospective rejection
+  of E7c.
+- If collapsed classes retain one-vs-rest AUROC above 0.55, treat their decision
+  failure as potentially recoverable and proceed to montage-aware learning.
