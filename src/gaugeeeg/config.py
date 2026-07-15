@@ -49,16 +49,23 @@ def validate_config(config: dict[str, Any]) -> None:
     if "car" not in [str(v).lower() for v in experiment.get("test_views", [])]:
         raise ValueError("test_views must include 'car' as the clean reference")
     probe = str(experiment.get("probe", "sklearn_logreg")).casefold()
-    if probe not in {"sklearn_logreg", "reve_token"}:
-        raise ValueError("probe must be 'sklearn_logreg' or 'reve_token'")
-    if probe == "reve_token" and experiment.get("reve_pooling") != "tokens":
-        raise ValueError("probe: reve_token requires reve_pooling: tokens")
+    if probe not in {"sklearn_logreg", "reve_token", "reve_set"}:
+        raise ValueError("probe must be 'sklearn_logreg', 'reve_token', or 'reve_set'")
+    if probe in {"reve_token", "reve_set"} and experiment.get("reve_pooling") != "tokens":
+        raise ValueError(f"probe: {probe} requires reve_pooling: tokens")
+    if probe == "reve_set":
+        if int(experiment.get("set_queries", 8)) < 1:
+            raise ValueError("set_queries must be positive")
+        if int(experiment.get("set_heads", 8)) < 1:
+            raise ValueError("set_heads must be positive")
     training_views = [str(view).casefold() for view in experiment.get("training_views", ["car"])]
     if not training_views or training_views[0] != "car":
         raise ValueError("training_views must start with 'car'")
     objective = str(experiment.get("probe_objective", "car_only")).casefold()
     if objective not in {"car_only", "multi_view_ce", "rule_consistency"}:
         raise ValueError("Unknown probe_objective")
+    if probe == "reve_set" and (objective != "car_only" or len(training_views) != 1):
+        raise ValueError("probe: reve_set currently requires CAR-only single-view training")
     if objective != "car_only" and len(training_views) < 2:
         raise ValueError(f"{objective} requires at least two training_views")
     if float(experiment.get("consistency_weight", 0.0)) < 0.0:
@@ -79,6 +86,7 @@ def with_overrides(
     training_views: list[str] | None = None,
     test_views: list[str] | None = None,
     defenses: list[str] | None = None,
+    set_queries: int | None = None,
 ) -> dict[str, Any]:
     result = deepcopy(config)
     experiment = result["experiment"]
@@ -104,6 +112,8 @@ def with_overrides(
         experiment["test_views"] = [str(view) for view in test_views]
     if defenses is not None:
         experiment["defenses"] = [str(defense) for defense in defenses]
+    if set_queries is not None:
+        experiment["set_queries"] = int(set_queries)
     validate_config(result)
     return result
 

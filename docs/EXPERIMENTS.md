@@ -17,6 +17,7 @@ sanity check fails.
 | E6c | Validation-only lambda ablation | `make consistency-lambda-ablation` | Selected λ and held-out-Cz evidence |
 | E7a | Reference + sparse-montage screen | `make montage-screen` | Fixed seed-7 limitation screen |
 | E7b | Native channel-subset validity screen | `make native-montage-screen` | Corrected benchmark decision |
+| E7c | Variable-set token readout gate | `make set-native-screen` | Clean gate, then corrected benchmark decision |
 
 ## E0 acceptance
 
@@ -116,3 +117,25 @@ pattern. E7b is a benchmark correction, not a new method result:
   more than 95% of predictions.
 - Only after this gate passes should a variable-set montage-aware probe or
   adapter be implemented and compared over repeated seeds.
+
+E7b did not pass the clean gate. The attention-pooled linear readout reached
+0.3988 clean CAR BAcc and 0.2606 on the primary `native16@cz` view. The native
+view construction and CAR-canonicalization identities behaved as expected,
+but the result cannot determine whether the montage stressor is useful.
+
+## E7c variable-set readout protocol
+
+- Keep the frozen REVE encoder, data split, preprocessing, native subsets,
+  primary view, and E7b validity thresholds unchanged.
+- Replace released single-query attention pooling with pooling by multihead
+  attention (PMA): a learned fixed-size query bank attends to the variable REVE
+  token set. Never flatten or zero-pad encoder tokens.
+- Predeclare query counts `{4, 8, 16}` and select one using only CAR validation
+  BAcc; break an exact tie toward the smaller head.
+- Use clean CAR test BAcc only as the predeclared 0.45 feasibility gate. Do not
+  generate or inspect native test views until query count is frozen and that
+  gate passes.
+- If clean passes, retrain the selected deterministic head and evaluate the
+  unchanged native suite under no defense and CAR canonicalization.
+- E7c validates a readout/benchmark pair. Montage dropout and joint
+  gauge/montage consistency are deferred until the native benchmark is usable.

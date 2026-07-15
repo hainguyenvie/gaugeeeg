@@ -363,6 +363,40 @@ to:
 outputs/reve_native_montage_screen_s7/native_montage_screen_summary.json
 ```
 
+The E7b run did not pass its clean gate: released attention pooling plus a
+linear probe reached only 0.3988 clean CAR BAcc, and `native16@cz` was 0.2606.
+This validates the native subset plumbing but leaves the benchmark outcome
+confounded by a weak readout.
+
+## Variable-set token readout gate
+
+E7c replaces only that readout. It uses learned queries with multihead
+attention to pool a variable number of frozen REVE tokens into a fixed-width
+classification input. Query count is selected from `{4, 8, 16}` using CAR
+validation BAcc; native-montage results do not exist during selection.
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+DEVICE=cuda make set-native-screen
+```
+
+The script reuses existing full-CAR token caches. It first writes
+`outputs/reve_set_head_selection_s7/set_head_selection.json`. If the selected
+head does not reach clean CAR test BAcc 0.45, it stops before the expensive
+native extraction. If it passes, it freezes the selected query count, runs the
+same native 32/16/8 and region-drop suite under no defense and CAR
+canonicalization, then writes:
+
+```text
+outputs/reve_set_native_montage_screen_s7/native_montage_screen_summary.json
+```
+
+E7c is a readout-validity stage, not yet the proposed montage-aware method. A
+usable native benchmark is the prerequisite for the next comparison between
+full-CAR training, montage dropout, and joint gauge/montage consistency.
+
 ## Reading the output
 
 Each run creates:

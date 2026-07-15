@@ -225,33 +225,53 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             predictor = probe.model
             selected_c = probe.selected_c
             validation_score = probe.validation_balanced_accuracy
-        elif probe_name == "reve_token":
-            from .torch_probe import fit_reve_token_probe
+        elif probe_name in {"reve_token", "reve_set"}:
+            if probe_name == "reve_token":
+                from .torch_probe import fit_reve_token_probe
+            else:
+                from .set_probe import fit_reve_set_probe
 
             initial_query = getattr(encoder, "pretrained_query", None)
             if initial_query is None:
                 raise ValueError("probe: reve_token requires encoder: reve")
-            probe = fit_reve_token_probe(
-                train_x,
-                train_y,
-                val_x,
-                val_y,
-                initial_query=initial_query,
-                n_classes=expected_classes,
-                seed=probe_seed,
-                device=str(experiment.get("device", "auto")),
-                batch_size=int(experiment.get("probe_batch_size", 32)),
-                epochs=int(experiment.get("probe_epochs", 20)),
-                learning_rate=float(experiment.get("probe_learning_rate", 1e-4)),
-                weight_decay=float(experiment.get("probe_weight_decay", 1e-2)),
-                dropout=float(experiment.get("probe_dropout", 0.1)),
-                warmup_epochs=int(experiment.get("probe_warmup_epochs", 5)),
-                patience=int(experiment.get("probe_patience", 5)),
-                clip_grad=float(experiment.get("probe_clip_grad", 2.0)),
-                deterministic=strict_determinism,
-                objective=probe_objective,
-                consistency_weight=consistency_weight,
-            )
+            common_probe_kwargs = {
+                "initial_query": initial_query,
+                "n_classes": expected_classes,
+                "seed": probe_seed,
+                "device": str(experiment.get("device", "auto")),
+                "batch_size": int(experiment.get("probe_batch_size", 32)),
+                "epochs": int(experiment.get("probe_epochs", 20)),
+                "learning_rate": float(experiment.get("probe_learning_rate", 1e-4)),
+                "weight_decay": float(experiment.get("probe_weight_decay", 1e-2)),
+                "dropout": float(experiment.get("probe_dropout", 0.1)),
+                "warmup_epochs": int(experiment.get("probe_warmup_epochs", 5)),
+                "patience": int(experiment.get("probe_patience", 5)),
+                "clip_grad": float(experiment.get("probe_clip_grad", 2.0)),
+                "deterministic": strict_determinism,
+            }
+            if probe_name == "reve_token":
+                probe = fit_reve_token_probe(
+                    train_x,
+                    train_y,
+                    val_x,
+                    val_y,
+                    objective=probe_objective,
+                    consistency_weight=consistency_weight,
+                    **common_probe_kwargs,
+                )
+            else:
+                if probe_objective != "car_only" or len(training_views) != 1:
+                    raise ValueError("probe: reve_set currently requires CAR-only single-view training")
+                probe = fit_reve_set_probe(
+                    train_x,
+                    train_y,
+                    val_x,
+                    val_y,
+                    n_queries=int(experiment.get("set_queries", 8)),
+                    n_heads=int(experiment.get("set_heads", 8)),
+                    ff_multiplier=int(experiment.get("set_ff_multiplier", 2)),
+                    **common_probe_kwargs,
+                )
             predictor = probe.model
             selected_epoch = probe.selected_epoch
             validation_score = probe.validation_balanced_accuracy
@@ -276,6 +296,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                         "probe_objective": probe_objective,
                         "training_views": training_views,
                         "consistency_weight": consistency_weight,
+                        "set_queries": int(experiment.get("set_queries", 0)),
+                        "set_heads": int(experiment.get("set_heads", 0)),
                     },
                     output_dir / f"probe_best_{defense}.pt",
                 )
@@ -353,6 +375,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 "probe": probe_name,
                 "probe_objective": probe_objective,
                 "consistency_weight": consistency_weight,
+                "set_queries": int(experiment.get("set_queries", 0)),
+                "set_heads": int(experiment.get("set_heads", 0)),
                 "selected_c": selected_c,
                 "selected_epoch": selected_epoch,
                 "validation_balanced_accuracy": validation_score,

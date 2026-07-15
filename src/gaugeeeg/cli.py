@@ -29,6 +29,7 @@ def _run_command(args: argparse.Namespace) -> None:
         training_views=args.training_views,
         test_views=args.test_views,
         defenses=args.defenses,
+        set_queries=args.set_queries,
     )
     run_experiment(config)
 
@@ -188,6 +189,18 @@ def _native_montage_screen_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _select_set_head_command(args: argparse.Namespace) -> None:
+    from .set_head_selection import select_set_head
+
+    result = select_set_head(
+        args.runs,
+        args.output_dir,
+        expected_queries=args.expected_queries,
+        clean_gate=args.clean_gate,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -208,6 +221,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--training-views", nargs="+", help="Override aligned train/validation views")
     run.add_argument("--test-views", nargs="+", help="Override evaluation observation views")
     run.add_argument("--defenses", nargs="+", help="Override preprocessing defenses")
+    run.add_argument("--set-queries", type=int, help="Override learned queries for probe: reve_set")
     run.set_defaults(handler=_run_command)
 
     download = subparsers.add_parser("download", help="Download and cache the configured dataset")
@@ -320,6 +334,16 @@ def build_parser() -> argparse.ArgumentParser:
     native_screen.add_argument("--bootstrap-confidence", type=float, default=0.95)
     native_screen.add_argument("--bootstrap-seed", type=int, default=20260714)
     native_screen.set_defaults(handler=_native_montage_screen_command)
+
+    set_head = subparsers.add_parser(
+        "select-set-head",
+        help="Select the E7c variable-set query count using CAR validation only",
+    )
+    set_head.add_argument("--runs", nargs="+", required=True)
+    set_head.add_argument("--expected-queries", nargs="+", type=int, default=[4, 8, 16])
+    set_head.add_argument("--clean-gate", type=float, default=0.45)
+    set_head.add_argument("--output-dir", default="outputs/reve_set_head_selection_s7")
+    set_head.set_defaults(handler=_select_set_head_command)
     return parser
 
 

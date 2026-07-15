@@ -278,3 +278,39 @@ the working hypothesis or paper direction.
 - Lambda 10 is not evaluated in E7b because transplanting its fixed-width head
   would change the method. Montage-aware variable-set learning begins only
   after E7b validates the corrected stressor.
+
+## 2026-07-15 — E7b result: native interface valid, readout gate failed
+
+- The full-montage CAR BAcc was 0.3988, below the predeclared 0.45 clean gate.
+  The released attention-pooled representation plus sklearn linear probe is
+  therefore too weak to validate the downstream montage benchmark.
+- Native 32/16/8 CAR BAcc values were 0.2616, 0.2489, and 0.2500. The primary
+  `native16@cz` BAcc was 0.2606, below the 0.27 noncollapse threshold.
+- The primary apparent full-to-native gap was 0.1382, but it cannot be treated
+  as a useful stress effect because both the clean and noncollapse gates failed.
+- CAR canonicalization removed reference residual exactly within each native
+  montage, supporting the reference algebra and native channel/coordinate
+  plumbing.
+- Representation CKA decreased with retained channel count under Cz (about
+  0.74 full, 0.64 at 32, 0.46 at 16, and 0.32 at 8). This is diagnostic only;
+  it does not rescue the failed readout gate.
+- Decision: do not repeat E7b or begin montage-aware training with this weak
+  pooled feature. Build a stronger variable-cardinality token readout first.
+
+## 2026-07-15 — E7c variable-set token readout protocol
+
+- Keep REVE frozen and operate on its token set. A fixed bank of learned
+  queries uses multihead attention to produce fixed-width output without
+  flattening raw tokens or zero-filling missing channels.
+- Predeclare query counts 4, 8, and 16. Select solely by CAR validation BAcc,
+  with the smaller count breaking exact ties. Native test rows are unavailable
+  during this selection.
+- Use selected clean CAR test BAcc >=0.45 as a feasibility gate. Stop and push
+  only the selection output if it fails.
+- If it passes, freeze query count and evaluate the unchanged native 32/16/8
+  and asymmetric region-drop suite under no defense and CAR canonicalization.
+- Keep `native16@cz` primary and reuse E7b's hard-shift/noncollapse criteria.
+  E7c validates the benchmark-compatible readout; it is not yet a claim for
+  montage-aware representation learning.
+- Only a usable E7c benchmark advances to montage dropout plus joint
+  gauge/montage consistency over seeds 7/21/42.

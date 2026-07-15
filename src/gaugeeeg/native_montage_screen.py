@@ -55,6 +55,8 @@ def _method_rows(method: str, run_dir: str | Path) -> pd.DataFrame:
             {
                 "method": method,
                 "run_dir": str(run_dir),
+                "probe": metric.get("probe", "unknown"),
+                "set_queries": int(metric.get("set_queries", 0)),
                 "test_view": view,
                 "reference_view": metric.get("reference_view", view),
                 "montage": metric.get("montage", "full"),
@@ -154,13 +156,23 @@ def analyze_native_montage_screen(
     )
     primary_size = primary_view.split("@", maxsplit=1)[0]
     paired_car_view = f"{primary_size}@car"
+    probe_name = str(clean["probe"])
+    set_queries = int(clean["set_queries"])
+    if probe_name.casefold() == "reve_set":
+        stage = "E7c variable-set native channel-subset validity screen"
+        encoder_readout = f"frozen REVE tokens plus validation-selected {set_queries}-query set probe"
+    else:
+        stage = "E7b native channel-subset validity screen"
+        encoder_readout = "REVE released attention pooling plus sklearn linear probe"
     summary = {
-        "stage": "E7b native channel-subset validity screen",
+        "stage": stage,
         "primary_view": primary_view,
         "channel_policy": (
             "select retained electrodes, reference within that montage, and remove other signals/coordinates"
         ),
-        "encoder_readout": "REVE released attention pooling plus sklearn linear probe",
+        "encoder_readout": encoder_readout,
+        "probe": probe_name,
+        "set_queries": set_queries,
         "clean_gate_passed": clean_gate,
         "clean_car_balanced_accuracy": float(clean["balanced_accuracy"]),
         "chance_balanced_accuracy": chance,

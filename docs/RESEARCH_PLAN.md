@@ -81,17 +81,20 @@ should be added only if the pilot establishes a meaningful failure mode.
 
 Current evidence has advanced beyond v0.1: a validation-selected prediction
 consistency loss improves held-out full-montage Cz robustness over ordinary
-multi-view augmentation. This remains a frozen-encoder robust readout. E7b now
-tests whether native missing-channel observations expose a meaningful failure
-mode after correcting E7a's zero-fill artifact. A positive E7b result is the
-gate for a trainable montage-aware adapter or encoder-level objective.
+multi-view augmentation. This remains a frozen-encoder robust readout. E7b's
+native construction was algebraically valid, but released attention pooling
+plus a linear probe failed the clean-performance gate. E7c therefore tests a
+variable-set frozen-token readout before attributing any error to the montage.
 
 The first E7a missing-channel implementation zero-filled absent electrodes and
 caused all probes to collapse near four-class chance. Because REVE accepts
 channel subsets and their positions natively, that result is an input-modeling
 artifact rather than evidence of an inherent foundation-model limitation. E7b
 therefore validates native removal with a fixed-dimensional attention-pooled
-readout before any montage-aware method is trained.
+readout before any montage-aware method is trained. E7c uses validation-only
+selection of a pooling-by-multihead-attention query count, followed by the same
+clean and noncollapse gates. Only a passing E7c result licenses montage-aware
+training and repeated-seed method comparisons.
 
 ## 6. Core hypotheses
 
