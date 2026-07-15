@@ -428,6 +428,37 @@ outputs/reve_set_full_reference_q4_none_s7
 outputs/reve_set_reference_closure_s7
 ```
 
+E7d reproduced q4 CAR predictions exactly. Full-montage Pz was the largest
+aggregate shift (0.0452 BAcc gap and 27.1% prediction disagreement), while the
+native16 montage gap was 0.2268. Full-reference class recall moved far more
+than per-class AUROC, supporting a relative class-margin bias; native16 caused
+a functional two-class collapse while retaining above-chance bilateral-class
+ranking.
+
+## Native reference-geometry diagnostic
+
+E7e tests whether the near-zero native16 CAR-versus-Cz BAcc gap generalizes to
+references away from the montage center. The complete predeclared suite uses
+Cz, Pz, and Fz within both 16- and 32-channel native montages; it does not pick
+a best test reference:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+DEVICE=cuda make set-reference-geometry
+```
+
+The run must reproduce E7d's CAR predictions exactly. The suite supports a
+joint gauge/montage method scope only if native16 Pz/Fz produces either an
+absolute BAcc gap of at least 0.03 or an absolute class-recall gap of at least
+0.10 whose subject-bootstrap interval excludes zero. Push:
+
+```text
+outputs/reve_set_native_reference_geometry_q4_s7
+outputs/reve_set_reference_geometry_audit_s7
+```
+
 ## Reading the output
 
 Each run creates:

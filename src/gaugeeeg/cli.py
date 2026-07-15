@@ -216,6 +216,21 @@ def _reference_closure_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _reference_geometry_command(args: argparse.Namespace) -> None:
+    from .reference_geometry import analyze_reference_geometry
+
+    result = analyze_reference_geometry(
+        args.run,
+        args.e7d_full_run,
+        args.selection,
+        args.output_dir,
+        n_resamples=args.bootstrap_resamples,
+        confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -372,6 +387,19 @@ def build_parser() -> argparse.ArgumentParser:
     closure.add_argument("--bootstrap-confidence", type=float, default=0.95)
     closure.add_argument("--bootstrap-seed", type=int, default=20260715)
     closure.set_defaults(handler=_reference_closure_command)
+
+    geometry = subparsers.add_parser(
+        "reference-geometry",
+        help="Audit Cz/Pz/Fz effects within fixed native montages",
+    )
+    geometry.add_argument("--run", required=True)
+    geometry.add_argument("--e7d-full-run", required=True)
+    geometry.add_argument("--selection", required=True)
+    geometry.add_argument("--output-dir", default="outputs/reve_set_reference_geometry_audit_s7")
+    geometry.add_argument("--bootstrap-resamples", type=int, default=10000)
+    geometry.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    geometry.add_argument("--bootstrap-seed", type=int, default=20260715)
+    geometry.set_defaults(handler=_reference_geometry_command)
     return parser
 
 

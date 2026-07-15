@@ -104,6 +104,14 @@ while their one-vs-rest AUROC remains above chance. E7d closes the missing
 full-reference comparison and quantifies this recoverable class-conditional
 decision bias before the learned montage method is introduced.
 
+E7d also showed that the near-zero native16 CAR-versus-Cz aggregate gap does
+not establish native gauge invariance: those predictions still disagreed on
+11.5% of trials, and Cz lies near the center of the selected motor montage.
+E7e therefore evaluates predeclared Pz/Fz alternatives at native16/native32.
+Its suite-level criterion decides whether the proposed method should jointly
+target gauge and montage transformations or treat gauge consistency as an
+auxiliary to a montage-primary method.
+
 ## 6. Core hypotheses
 
 - **H1:** Frozen REVE embeddings and linear-probe performance change under

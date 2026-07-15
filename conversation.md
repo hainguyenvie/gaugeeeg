@@ -354,3 +354,38 @@ the working hypothesis or paper direction.
   original gate and label this criterion post-hoc.
 - If the collapsed classes retain AUROC >=0.55, proceed next to supervised
   montage dropout and a joint gauge/montage representation-consistency method.
+
+## 2026-07-15 — E7d result: deterministic closure and recoverable class collapse
+
+- The q4 CAR predictions matched E7c exactly, validating the E7d comparison.
+- Full CAR-to-Cz/Pz/FCz BAcc gaps were 0.0373, 0.0452, and 0.0279, with
+  prediction disagreements 19.2%, 27.1%, and 18.6%. Pz was the largest
+  exploratory full-reference effect.
+- Under Pz, left-fist recall fell from 0.632 to 0.435 while both-feet recall
+  rose from 0.623 to 0.806; both subject-bootstrap intervals excluded zero.
+  Per-class AUROC changed much less, supporting a relative class-margin bias
+  rather than complete information destruction.
+- Full CAR to native16 CAR lost 0.2268 BAcc and changed 60.9% of predictions.
+  Both-fists/both-feet recall fell to 0.000/0.004 with bootstrap gaps 0.509 and
+  0.618, while their AUROC remained 0.615/0.681.
+- Native16 CAR versus Cz changed 11.5% of predictions but had a -0.0005 BAcc
+  gap. Aggregate cancellation must not be interpreted as identical decisions.
+- Hypothesis for the weak native Cz aggregate effect: sparse16 is a compact
+  motor-centric montage containing Cz, so its internal CAR may be close to Cz.
+  This is plausible but not established by E7d.
+
+## 2026-07-15 — E7e native reference-geometry protocol
+
+- Freeze q4 and CAR-only training. Evaluate complete CAR/Cz/Pz/Fz suites for
+  native32 and native16, with no new hyperparameter or target selection.
+- Pz and Fz are retained in both montages and are predeclared as less-central
+  alternatives to Cz. Named electrodes are only a geometry diagnostic, not a
+  continuous calibrated distance measure.
+- Require exact reproduction of E7d CAR predictions before analysis.
+- Report BAcc gaps, prediction disagreement, representation drift, class
+  recall/AUROC, and paired subject-bootstrap recall intervals for every view.
+- Support joint gauge/montage method scope if native16 Pz/Fz has absolute BAcc
+  gap >=0.03 or absolute class-recall gap >=0.10 with CI excluding zero.
+  Disagreement >=0.15 is supporting evidence only.
+- If this suite-level criterion fails, make montage robustness the main method
+  and keep gauge consistency as an auxiliary regularizer.

@@ -19,6 +19,7 @@ sanity check fails.
 | E7b | Native channel-subset validity screen | `make native-montage-screen` | Corrected benchmark decision |
 | E7c | Variable-set token readout gate | `make set-native-screen` | Clean gate, then corrected benchmark decision |
 | E7d | q4 reference/class closure | `make set-reference-closure` | Full-reference and functional-collapse audit |
+| E7e | Native reference geometry | `make set-reference-geometry` | Joint-vs-montage-primary scope decision |
 
 ## E0 acceptance
 
@@ -163,3 +164,26 @@ but not tied: q4 strictly exceeded q8 and q16 on validation.
   of E7c.
 - If collapsed classes retain one-vs-rest AUROC above 0.55, treat their decision
   failure as potentially recoverable and proceed to montage-aware learning.
+
+E7d reproduced the E7c q4 CAR predictions exactly. Full Pz produced the
+largest full-montage shift: 0.0452 BAcc and 27.1% prediction disagreement.
+Native16 CAR lost 0.2268 BAcc relative to full CAR and assigned 99.7% of
+predictions to two classes, while the collapsed bilateral classes retained
+AUROC 0.615 and 0.681.
+
+## E7e geometry-controlled native-reference protocol
+
+- Keep the q4 architecture, CAR-only training, subject split, probe seed, and
+  reference seed fixed. Require exact E7d CAR prediction reproduction.
+- Evaluate the complete native32 and native16 Cartesian suite under CAR, Cz,
+  Pz, and Fz. Pz/Fz are chosen before observing native results because they are
+  retained in both montages and are less central than Cz.
+- Report every reference. Do not choose a single E7e winner for method
+  evaluation.
+- Call joint gauge/montage scope supported if native16 Pz or Fz yields either
+  absolute BAcc gap >=0.03 or absolute class-recall gap >=0.10 with a paired
+  subject-bootstrap interval excluding zero.
+- Prediction disagreement >=0.15 is supporting evidence but cannot alone
+  trigger the joint-method decision.
+- If the criterion fails, develop montage robustness as the primary method and
+  retain gauge consistency only as an auxiliary regularizer.
