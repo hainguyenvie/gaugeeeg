@@ -219,3 +219,38 @@ AUROC 0.615 and 0.681.
   or gauge-aware readout. If only target-view-specific calibration passes, it
   remains a strong baseline but requires known-view labels. If neither passes,
   proceed to joint gauge/montage representation learning.
+
+E8 passed only the view-specific class-bias gate. It reduced the suite's worst
+recall gap from 0.353 to 0.116 and increased worst native BAcc from 0.373 to
+0.432. Leave-one-view-out class bias increased the worst recall gap to 0.614,
+despite improving BAcc on several views. Pz was the principal over-correction.
+
+## E9 validation-only reference-bias manifold protocol
+
+- Keep q4, preprocessing, seeds, and feature cache fixed. Extract the complete
+  native16/native32 electrode-reference grid only for validation subjects;
+  the ordinary test path remains full CAR only.
+- Split the original validation subjects before analysis: 71--80 fit oracle
+  per-reference bias targets and 81--89 evaluate all predictions. These groups
+  are disjoint and PhysioNet test subjects 90--109 are not used by the E9
+  manifold analysis or its method-selection gate.
+- Hold out an electrode identity across both montages. For example, a Pz fold
+  excludes native16@Pz and native32@Pz from bias-predictor training.
+- Compare identity, global-mean bias, pooled bias (the E8 strategy on the
+  expanded grid), nominal 10--20 topology ridge, unlabeled target-batch
+  logit-statistics ridge, their concatenation, and a target-label oracle upper
+  bound. Ridge alpha is fixed at 1.0.
+- Labels from the held-out reference may define its oracle bias for error
+  measurement and the upper bound only. A unit test perturbs those labels and
+  requires every deployable held-out prediction to remain exactly unchanged.
+- Require exact reproduction of every E8 validation view/logit shared with the
+  E9 grid before interpreting results.
+- The primary combined predictor passes if its leave-one-electrode-out bias
+  RMSE is at least 20% lower than the better of global-mean and pooled bias,
+  its worst class-recall gap is at least 30% lower than identity, and mean BAcc
+  is no more than 0.01 below the better simple baseline. No PhysioNet test
+  result selects a method.
+- Passing combined/topology conditioning licenses an operator-conditioned
+  calibrator. Passing logit-only conditioning licenses label-free batch
+  adaptation. If all fail, simple smooth bias-manifold assumptions are not a
+  viable method foundation.

@@ -70,8 +70,10 @@ no prior study has addressed this problem.
    task performance and representation-drift metrics.
 2. **Exact sanity baseline.** CAR canonicalization proves the benchmark is
    measuring the intended additive gauge component.
-3. **Gauge-aware representation learning.** Train an adapter or continue
-   pretraining with paired valid references and a consistency objective.
+3. **Gauge/montage-conditioned readout.** Predict class-scale and class-bias
+   corrections from the known observation operator and label-free logit
+   statistics; retain representation consistency only if calibration controls
+   cannot explain the failure.
 4. **Beyond ideal common-mode shifts.** Extend to bipolar derivations,
    missing-channel montages, and cross-dataset transfer, where exact CAR
    canonicalization alone is insufficient.
@@ -111,6 +113,16 @@ E7e therefore evaluates predeclared Pz/Fz alternatives at native16/native32.
 Its suite-level criterion decides whether the proposed method should jointly
 target gauge and montage transformations or treat gauge consistency as an
 auxiliary to a montage-primary method.
+
+E8 subsequently localized the dominant recoverable error to the readout. A
+three-parameter target-view class bias reduced the worst within-montage recall
+gap by 67.3% and improved worst native BAcc, while leave-one-view-out pooled
+bias over-corrected Pz and increased the worst recall gap. The current research
+gap is therefore not generic representation invariance: it is predicting a
+reference- and montage-conditional correction without labeled trials from the
+target observation operator. E9 tests whether nominal topology and unlabeled
+logit statistics provide enough structure for that method before a learned
+calibrator is implemented.
 
 ## 6. Core hypotheses
 

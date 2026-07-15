@@ -1,4 +1,4 @@
-.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control
+.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control set-bias-manifold
 
 install:
 	python -m pip install -e ".[data,dev]"
@@ -35,3 +35,6 @@ set-reference-geometry:
 
 set-calibration-control:
 	bash scripts/run_reve_set_calibration_control.sh
+
+set-bias-manifold:
+	bash scripts/run_reve_set_bias_manifold.sh

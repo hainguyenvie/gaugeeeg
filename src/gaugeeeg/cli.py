@@ -249,6 +249,24 @@ def _calibration_control_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _bias_manifold_command(args: argparse.Namespace) -> None:
+    from .bias_manifold import analyze_bias_manifold
+
+    result = analyze_bias_manifold(
+        args.validation_predictions,
+        args.output_dir,
+        fit_subjects=args.fit_subjects,
+        evaluation_subjects=args.evaluation_subjects,
+        e8_validation_predictions=args.e8_validation_predictions,
+        ridge_alpha=args.ridge_alpha,
+        l2=args.l2,
+        minimum_rmse_reduction=args.minimum_rmse_reduction,
+        minimum_recall_gap_reduction=args.minimum_recall_gap_reduction,
+        max_mean_bacc_loss_vs_simple=args.max_mean_bacc_loss_vs_simple,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -434,6 +452,32 @@ def build_parser() -> argparse.ArgumentParser:
     calibration.add_argument("--min-recall-shift-reduction", type=float, default=0.50)
     calibration.add_argument("--max-worst-bacc-loss", type=float, default=0.01)
     calibration.set_defaults(handler=_calibration_control_command)
+
+    manifold = subparsers.add_parser(
+        "bias-manifold",
+        help="Test reference-bias predictability using validation subjects only",
+    )
+    manifold.add_argument("--validation-predictions", required=True)
+    manifold.add_argument("--e8-validation-predictions")
+    manifold.add_argument("--output-dir", default="outputs/reve_set_bias_manifold_audit_s7")
+    manifold.add_argument(
+        "--fit-subjects",
+        nargs="+",
+        type=int,
+        default=list(range(71, 81)),
+    )
+    manifold.add_argument(
+        "--evaluation-subjects",
+        nargs="+",
+        type=int,
+        default=list(range(81, 90)),
+    )
+    manifold.add_argument("--ridge-alpha", type=float, default=1.0)
+    manifold.add_argument("--l2", type=float, default=1e-4)
+    manifold.add_argument("--minimum-rmse-reduction", type=float, default=0.20)
+    manifold.add_argument("--minimum-recall-gap-reduction", type=float, default=0.30)
+    manifold.add_argument("--max-mean-bacc-loss-vs-simple", type=float, default=0.01)
+    manifold.set_defaults(handler=_bias_manifold_command)
     return parser
 
 

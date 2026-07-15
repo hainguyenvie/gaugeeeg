@@ -211,8 +211,16 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     probe_objective = str(experiment.get("probe_objective", "car_only")).casefold()
     consistency_weight = float(experiment.get("consistency_weight", 0.0))
     views = [str(view) for view in experiment.get("test_views", ["car"])]
+    validation_prediction_views = [
+        str(view) for view in experiment.get("validation_prediction_views", views)
+    ]
+    if not validation_prediction_views:
+        raise ValueError("validation_prediction_views must not be empty")
     defenses = [str(defense) for defense in experiment.get("defenses", ["none"])]
-    if any(parse_observation_view(view).channel_policy == "remove" for view in views):
+    if any(
+        parse_observation_view(view).channel_policy == "remove"
+        for view in [*views, *validation_prediction_views]
+    ):
         if str(experiment.get("probe", "sklearn_logreg")).casefold() == "reve_token":
             raise ValueError(
                 "Native channel-subset views change token count and cannot use the fixed-width "
@@ -377,7 +385,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             validation_subjects = dataset.subset(splits["val"]).subjects
             if validation_subjects.size != val_y.size:
                 raise RuntimeError("Validation subject metadata is not aligned with validation labels")
-            for view in views:
+            for view in validation_prediction_views:
                 key = view.casefold()
                 if key not in validation_feature_by_view:
                     features, labels = _extract_features(
@@ -608,6 +616,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "probe_objective": probe_objective,
         "training_views": training_views,
         "test_observation_views": views,
+        "validation_prediction_views": validation_prediction_views,
         "consistency_weight": consistency_weight,
         "validation_balanced_accuracy": validation_score,
         "validation_consistency_loss": validation_consistency_loss,

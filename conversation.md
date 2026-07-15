@@ -417,3 +417,33 @@ the working hypothesis or paper direction.
   sensitivity analysis, so no method is selected from test results. The result
   will determine whether to develop a calibration/readout method or proceed to
   joint gauge/montage representation learning.
+
+## 2026-07-15 — E8 result and E9 reference-bias manifold decision
+
+- All leakage and reproduction checks passed. View-specific class bias reduced
+  the worst recall gap from 0.353 to 0.116 (67.3%) and increased worst native
+  BAcc from 0.373 to 0.432, so the predeclared oracle calibration gate passed.
+- Leave-one-view-out bias did not transfer. Its worst recall gap rose to 0.614,
+  driven by native16 Pz both-feet recall 0.740 versus 0.126 at native16 CAR.
+  Nevertheless, it significantly improved BAcc on native16 CAR/Cz/Fz and
+  native32 Fz. Thus it is an unstable over-correction rather than a uniformly
+  useless baseline.
+- Vector scaling matched bias on decision stability while giving much lower
+  ECE, so a final calibration method may need both scale and bias. E8 still
+  predeclared bias as the primary causal diagnostic and did not select vector
+  scaling post hoc.
+- The limitation is now precise: a pooled correction can improve mean task
+  performance yet amplify worst-reference class inconsistency because the
+  required correction depends on reference identity and montage.
+- E9 expands validation-only inference to every retained reference electrode.
+  Subjects 71--80 fit oracle bias targets and subjects 81--89 evaluate them;
+  reference identity is held out across native16 and native32 simultaneously.
+- E9 compares global mean, E8-style pooled bias, nominal-topology ridge,
+  label-free logit-statistics ridge, and their combination. Held-out target
+  labels are available only to calculate oracle prediction error and an upper
+  bound. A leakage unit test requires every deployable prediction to remain
+  unchanged when those labels are perturbed.
+- The combined predictor must beat the better simple bias baseline's RMSE by
+  20%, reduce the worst recall gap by 30%, and lose no more than 0.01 mean
+  BAcc versus the better simple baseline. Only then will an
+  operator-conditioned calibrator be implemented.

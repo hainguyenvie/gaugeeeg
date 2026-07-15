@@ -537,3 +537,31 @@ outputs/reve_set_calibration_control_s7
 Push both directories. `calibration_summary.json` distinguishes an oracle
 known-view calibration result from leave-one-view-out generalization; scalar
 temperature is retained as an argmax-invariant NLL/ECE control.
+
+## Validation-only reference-bias manifold
+
+E9 asks whether the target-specific correction exposed by E8 can be predicted
+without labels from the held-out reference. It evaluates every electrode in
+the native16 and native32 montages on validation subjects only. Subjects
+71--80 fit per-reference bias targets; subjects 81--89 evaluate leave-one-
+electrode-out transfer. The same electrode identity is removed from both
+montages in each fold:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+DEVICE=cuda make set-bias-manifold
+```
+
+The controls are global-mean and pooled bias (the E8 strategy on the expanded
+grid). Candidate predictors use nominal 10--20 topology, label-free batch-logit
+statistics, or their combination. Target-reference labels are used only for
+the oracle upper bound and prediction-error audit, never for fitting a
+candidate. A candidate must beat the better simple control. E9 does not
+evaluate the reference grid on PhysioNet test subjects. Push:
+
+```text
+outputs/reve_set_bias_manifold_logits_q4_s7
+outputs/reve_set_bias_manifold_audit_s7
+```
