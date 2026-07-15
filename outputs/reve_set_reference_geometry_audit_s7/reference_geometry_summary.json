@@ -1,0 +1,46 @@
+{
+  "stage": "E7e geometry-controlled native-reference diagnostic",
+  "selected_queries_frozen": 4,
+  "predeclared_references": [
+    "cz",
+    "pz",
+    "fz"
+  ],
+  "predeclared_montage_sizes": [
+    32,
+    16
+  ],
+  "selection_rule": "No reference is selected from E7e test; report the complete suite.",
+  "car_trials_reproduced": true,
+  "car_predictions_reproduced_exactly": true,
+  "e7d_full_pz_balanced_accuracy_gap_for_context": 0.045241519429591,
+  "native16_by_reference": [
+    {
+      "reference": "cz",
+      "balanced_accuracy_gap": -0.0005272721102582145,
+      "prediction_disagreement": 0.115363283416528
+    },
+    {
+      "reference": "pz",
+      "balanced_accuracy_gap": -0.036116658191075346,
+      "prediction_disagreement": 0.2839711591791459
+    },
+    {
+      "reference": "fz",
+      "balanced_accuracy_gap": 0.01185037056896815,
+      "prediction_disagreement": 0.18136439267886856
+    }
+  ],
+  "native16_largest_absolute_bacc_gap_reference": "pz",
+  "native16_largest_absolute_bacc_gap": 0.036116658191075346,
+  "native16_alternative_largest_absolute_class_recall_gap_reference": "pz",
+  "native16_alternative_largest_absolute_class_recall_gap_class": "both_feet",
+  "native16_alternative_largest_absolute_class_recall_gap": 0.29580573951434874,
+  "native16_alternative_aggregate_shift_supported": true,
+  "native16_alternative_class_shift_supported": true,
+  "native16_alternative_disagreement_supported": true,
+  "joint_gauge_montage_target_supported": true,
+  "method_scope_decision": "joint_gauge_montage_learning",
+  "decision_rule": "Joint scope is supported when native16 Pz/Fz produces either an absolute BAcc gap >=0.03 or an absolute class-recall gap >=0.10 with a subject-bootstrap CI excluding zero.",
+  "geometry_caveat": "Cz/Pz/Fz are named-electrode diagnostics, not a calibrated continuous measure of distance from the montage centroid."
+}
