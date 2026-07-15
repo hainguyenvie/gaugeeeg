@@ -49,7 +49,7 @@ read -r SELECTED_QUERIES CLEAN_PASSED < <(
 )
 if [[ "${CLEAN_PASSED}" != "1" ]]; then
   echo "E7c stopped: validation-selected set head did not pass clean test BAcc >= 0.45." >&2
-  echo "Push outputs/reve_set_head_selection_s7 so the failed gate can be reviewed." >&2
+  echo "Push the three reve_set_clean_q*_s7 directories and reve_set_head_selection_s7." >&2
   exit 0
 fi
 
@@ -88,6 +88,9 @@ run_native_if_missing "${CANONICAL}" car_canonicalize
   --output-dir outputs/reve_set_native_montage_screen_s7
 
 echo "Completed E7c. Push these result directories:"
+echo "  outputs/reve_set_clean_q4_s7"
+echo "  outputs/reve_set_clean_q8_s7"
+echo "  outputs/reve_set_clean_q16_s7"
 echo "  outputs/reve_set_head_selection_s7"
 echo "  ${BASELINE}"
 echo "  ${CANONICAL}"
