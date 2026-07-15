@@ -1,0 +1,36 @@
+{
+  "encoder": "reve",
+  "seed": 7,
+  "probe_seed": 7,
+  "reference_seed": 7,
+  "strict_determinism": true,
+  "probe_objective": "car_only",
+  "training_views": [
+    "car"
+  ],
+  "test_observation_views": [
+    "car"
+  ],
+  "consistency_weight": 0.0,
+  "validation_balanced_accuracy": 0.5594972475095404,
+  "validation_consistency_loss": 0.0,
+  "validation_prediction_disagreement": 0.0,
+  "n_trials": 9837,
+  "n_channels": 64,
+  "sfreq": 200.0,
+  "largest_balanced_accuracy_gap": 0.0,
+  "lowest_paired_cosine": 1.0,
+  "clean_car_balanced_accuracy": 0.611212242089543,
+  "clean_gate_min_balanced_accuracy": 0.45,
+  "clean_gate_passed": true,
+  "worst_reference_view": null,
+  "largest_balanced_accuracy_drop": 0.0,
+  "largest_absolute_balanced_accuracy_change": 0.0,
+  "stress_effect_min_balanced_accuracy_drop": 0.03,
+  "stress_effect_detected": false,
+  "feature_cache_dir": "outputs/reve_clean_gate/feature_cache",
+  "metrics_path": "outputs/reve_set_clean_q4_s7/metrics.csv",
+  "predictions_path": "outputs/reve_set_clean_q4_s7/predictions.csv",
+  "subject_metrics_path": "outputs/reve_set_clean_q4_s7/subject_metrics.csv",
+  "paired_subject_bootstrap_path": null
+}

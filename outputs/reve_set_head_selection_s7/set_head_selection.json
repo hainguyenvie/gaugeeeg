@@ -1,0 +1,19 @@
+{
+  "stage": "E7c variable-set readout gate",
+  "selection_data": "validation subjects only",
+  "selection_metric": "CAR validation balanced accuracy",
+  "tie_break": "smaller query count",
+  "expected_query_grid": [
+    4,
+    8,
+    16
+  ],
+  "selected_queries": 4,
+  "selected_epoch": 13,
+  "selected_validation_balanced_accuracy": 0.5594972475095404,
+  "selected_clean_test_balanced_accuracy": 0.611212242089543,
+  "clean_gate_threshold": 0.45,
+  "clean_gate_passed": true,
+  "decision": "proceed_to_native_montage",
+  "leakage_control": "Native montage rows are not generated until after query count is frozen; clean test BAcc is used only as a feasibility gate."
+}

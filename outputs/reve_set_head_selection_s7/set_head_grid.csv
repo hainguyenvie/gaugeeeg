@@ -1,0 +1,4 @@
+run_dir,set_queries,selected_epoch,validation_balanced_accuracy,selected_by_validation,clean_test_balanced_accuracy
+outputs/reve_set_clean_q4_s7,4,13,0.5594972475095404,True,0.611212242089543
+outputs/reve_set_clean_q8_s7,8,11,0.5560847870372647,False,
+outputs/reve_set_clean_q16_s7,16,13,0.5548154209686573,False,
