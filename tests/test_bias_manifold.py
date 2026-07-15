@@ -34,6 +34,10 @@ class BiasManifoldTests(unittest.TestCase):
             predictions = root / "validation_predictions.csv"
             frame = self._make_predictions()
             frame.to_csv(predictions, index=False)
+            e8_predictions = root / "e8_validation_predictions.csv"
+            e8_frame = frame.copy()
+            e8_frame["test_view"] = e8_frame["test_view"].str.casefold()
+            e8_frame.to_csv(e8_predictions, index=False)
 
             output = root / "audit"
             aggregate = analyze_bias_manifold(
@@ -41,7 +45,7 @@ class BiasManifoldTests(unittest.TestCase):
                 output,
                 fit_subjects=[71, 72],
                 evaluation_subjects=[81, 82],
-                e8_validation_predictions=predictions,
+                e8_validation_predictions=e8_predictions,
                 ridge_alpha=1.0,
             )
             summary = json.loads((output / "bias_manifold_summary.json").read_text())
@@ -53,6 +57,10 @@ class BiasManifoldTests(unittest.TestCase):
                 summary["e8_shared_output_reproduction"][
                     "shared_predictions_reproduced_exactly"
                 ]
+            )
+            self.assertEqual(
+                len(summary["e8_shared_output_reproduction"]["shared_views"]),
+                10,
             )
             self.assertEqual(
                 set(aggregate["method"]),

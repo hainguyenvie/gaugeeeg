@@ -447,3 +447,41 @@ the working hypothesis or paper direction.
   20%, reduce the worst recall gap by 30%, and lose no more than 0.01 mean
   BAcc versus the better simple baseline. Only then will an
   operator-conditioned calibrator be implemented.
+
+## 2026-07-15 — E9 result review and E10 prior-stress decision
+
+- E9 completed all 50 native validation views and 48 held-out target views.
+  Topology, logit-only, and combined ridge all passed the predeclared gate.
+  Their mean bias RMSE values were 0.223, 0.037, and 0.044 versus 0.559 for
+  global mean and 0.562 for E8-style pooled bias.
+- Logit-only/combined increased mean BAcc from 0.420 to 0.462 and reduced the
+  worst class-recall gap from 0.478 to 0.205/0.181. Candidate fitting remained
+  disjoint from held-out reference labels and PhysioNet test subjects.
+- The E9 reproduction summary listed only native16/native32 CAR because view
+  matching was case-sensitive. A manual case-normalized comparison verified
+  all eight shared CAR/Cz/Fz/Pz views exactly: identical keys, predictions,
+  logits, and maximum absolute logit difference 0.0. The audit code is fixed
+  to normalize view case.
+- E9's apparent logit manifold is largely an objective identity. For additive
+  bias, supervised NLL uses labels only through empirical class proportions.
+  The fit counts were 225/225/224/226. Replacing labels with that prior matched
+  oracle bias at mean RMSE below 0.000001; using a label-free uniform prior
+  still achieved RMSE 0.0035, mean BAcc 0.4629, and worst recall gap 0.181.
+- The method limitation is now known-prior and batch dependence. With an
+  unknown class mix, logit statistics confound reference bias with label shift;
+  with a small batch, the prior-matching estimate has high variance.
+- E10 is CPU-only on the committed E9 logits. It evaluates random batches from
+  16 to 900 trials, balanced batches at 32/128, and 40%/70% controlled class
+  skews at 128. Stress labels construct batches and score results only.
+- The candidate shrinks prior-matching bias toward leave-one-electrode-out
+  topology ridge. Its weight is estimated using nested errors from non-target
+  references only. At primary random n=32 it must reduce RMSE by 20%, reduce
+  mean maximum recall gap by 10%, preserve BAcc within 0.01, beat topology
+  RMSE, and have a paired reference/resample-bootstrap RMSE interval below
+  zero.
+- A pre-push end-to-end CPU verification with the frozen defaults completed
+  on the committed E9 logits. It produced 38.0% RMSE reduction, 19.5% mean
+  maximum-recall-gap reduction, +0.0022 mean BAcc, and a paired RMSE-delta CI
+  [-0.154, -0.069] at random n=32. Severe-skew RMSE was 3.0 times balanced
+  RMSE at n=128. These temporary outputs are not committed; the user run is
+  the independent reproduction artifact.

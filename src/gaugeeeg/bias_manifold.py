@@ -241,12 +241,18 @@ def _confirm_e8_reproduction(
     previous, previous_classes = _load_predictions(e8_path)
     if [column.removeprefix("logit_") for column in logit_columns] != previous_classes:
         raise ValueError("E8 and E9 class columns differ")
-    shared = sorted(set(current["test_view"]) & set(previous["test_view"]))
+    current = current.assign(_view_key=current["test_view"].astype(str).str.casefold())
+    previous = previous.assign(_view_key=previous["test_view"].astype(str).str.casefold())
+    if current.duplicated(["_view_key", "trial_index"]).any():
+        raise ValueError("E9 contains duplicate case-normalized view/trial rows")
+    if previous.duplicated(["_view_key", "trial_index"]).any():
+        raise ValueError("E8 contains duplicate case-normalized view/trial rows")
+    shared = sorted(set(current["_view_key"]) & set(previous["_view_key"]))
     if not shared:
         raise RuntimeError("E8 and E9 validation files have no shared views")
-    keys = ["test_view", "trial_index", "subject_id", "y_true"]
-    left = current.loc[current["test_view"].isin(shared), keys + ["y_pred", *logit_columns]]
-    right = previous.loc[previous["test_view"].isin(shared), keys + ["y_pred", *logit_columns]]
+    keys = ["_view_key", "trial_index", "subject_id", "y_true"]
+    left = current.loc[current["_view_key"].isin(shared), keys + ["y_pred", *logit_columns]]
+    right = previous.loc[previous["_view_key"].isin(shared), keys + ["y_pred", *logit_columns]]
     left = left.sort_values(keys).reset_index(drop=True)
     right = right.sort_values(keys).reset_index(drop=True)
     aligned = left[keys].equals(right[keys])

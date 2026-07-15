@@ -20,6 +20,9 @@ sanity check fails.
 | E7c | Variable-set token readout gate | `make set-native-screen` | Clean gate, then corrected benchmark decision |
 | E7d | q4 reference/class closure | `make set-reference-closure` | Full-reference and functional-collapse audit |
 | E7e | Native reference geometry | `make set-reference-geometry` | Joint-vs-montage-primary scope decision |
+| E8 | Validation-only calibration control | `make set-calibration-control` | Readout-vs-representation decision |
+| E9 | Reference-bias manifold audit | `make set-bias-manifold` | Unseen-electrode bias predictability |
+| E10 | Known-prior/small-batch stress | `make set-prior-stress` | Prior confounding and topology-shrinkage decision |
 
 ## E0 acceptance
 
@@ -254,3 +257,51 @@ despite improving BAcc on several views. Pz was the principal over-correction.
   calibrator. Passing logit-only conditioning licenses label-free batch
   adaptation. If all fail, simple smooth bias-manifold assumptions are not a
   viable method foundation.
+
+E9 passed all three candidate gates. Across 48 held-out target views,
+topology/logit/combined ridge achieved bias RMSE 0.223/0.037/0.044 versus
+0.559 for global mean. Logit-only and combined raised mean BAcc from 0.420 to
+0.462 and reduced the worst recall gap from 0.478 to 0.205/0.181. After
+case-normalizing view names, all eight E8 views shared with E9 reproduce
+predictions and logits exactly; the original summary reported only the two
+CAR views because its matching was case-sensitive.
+
+The E9 oracle bias is not a general label-dependent target. Its three
+parameters correlate at absolute 0.996--0.999 with the corresponding centered
+logit means. More importantly, the additive-bias NLL objective depends on
+labels only through class proportions. Matching the observed empirical prior
+reproduces supervised oracle parameters to numerical tolerance; using the
+predeclared uniform task prior gives mean bias RMSE 0.0035. Learned logit ridge
+is therefore not the baseline to carry forward.
+
+## E10 known-prior and small-batch stress protocol
+
+- Reuse the E9 validation logits; do not run the encoder or use PhysioNet test
+  subjects. Keep subjects 71--80 for calibration-batch construction and
+  81--89 for task evaluation.
+- Use the known four-class uniform task prior. Verify separately that the
+  empirical fit prior reproduces the supervised bias optimum, but label this
+  as a mathematical diagnostic rather than a deployable input.
+- Evaluate random unlabeled batches of 16, 32, 64, 128, 256, 512, and all 900
+  fitting trials with 20 fixed resamples except for the deterministic full
+  batch.
+- At batch sizes 32 and 128, add class-balanced batches. At 128, add four
+  dominant-class variants at 40% and 70%. Labels are allowed only to construct
+  these controlled stress batches and calculate audit metrics.
+- Compare identity, leave-one-electrode-out topology ridge, known-prior
+  matching, topology shrinkage, and a supervised oracle. A target electrode is
+  excluded across both montages from topology training and shrinkage-weight
+  estimation.
+- Set the weight on prior matching from source-reference errors only:
+  `w_prior = MSE_topology / (MSE_topology + MSE_prior)`. Use random source
+  batches to estimate this weight; do not retune it on balanced or skewed
+  target conditions.
+- The primary condition is random `n=32`. Shrinkage passes only if it reduces
+  mean bias RMSE by at least 20% versus prior matching, beats topology-only
+  RMSE, reduces mean maximum recall gap by at least 10%, loses no more than
+  0.01 mean BAcc, and has a paired reference/resample-bootstrap RMSE-delta
+  interval below zero.
+- Report prior confounding when severe skew at `n=128` at least doubles RMSE,
+  loses 0.03 BAcc, or increases mean maximum recall gap by 0.05 relative to
+  balanced batches. This limitation remains mandatory even if shrinkage
+  passes.

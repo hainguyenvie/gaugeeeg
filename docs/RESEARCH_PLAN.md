@@ -70,10 +70,9 @@ no prior study has addressed this problem.
    task performance and representation-drift metrics.
 2. **Exact sanity baseline.** CAR canonicalization proves the benchmark is
    measuring the intended additive gauge component.
-3. **Gauge/montage-conditioned readout.** Predict class-scale and class-bias
-   corrections from the known observation operator and label-free logit
-   statistics; retain representation consistency only if calibration controls
-   cannot explain the failure.
+3. **Operator-regularized known-prior readout.** Use the known task prior for
+   label-free bias correction and shrink uncertain small-batch estimates toward
+   a correction predicted from the observation operator.
 4. **Beyond ideal common-mode shifts.** Extend to bipolar derivations,
    missing-channel montages, and cross-dataset transfer, where exact CAR
    canonicalization alone is insufficient.
@@ -120,9 +119,16 @@ gap by 67.3% and improved worst native BAcc, while leave-one-view-out pooled
 bias over-corrected Pz and increased the worst recall gap. The current research
 gap is therefore not generic representation invariance: it is predicting a
 reference- and montage-conditional correction without labeled trials from the
-target observation operator. E9 tests whether nominal topology and unlabeled
-logit statistics provide enough structure for that method before a learned
-calibrator is implemented.
+target observation operator.
+
+E9 showed that full-batch logit statistics predict the oracle bias almost
+perfectly, but subsequent analysis exposed a stronger identity: bias-only NLL
+depends on labels only through their class prior. Because the motor-imagery cue
+schedule is nearly balanced, a known uniform prior recovers the supervised
+oracle without learned manifold regression. The remaining defensible gap is
+small-batch and prior-robust adaptation. E10 therefore tests whether topology
+provides a useful inductive bias when unlabeled batches are scarce, and
+explicitly falsifies the method under unknown or shifted class proportions.
 
 ## 6. Core hypotheses
 

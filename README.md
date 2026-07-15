@@ -565,3 +565,37 @@ evaluate the reference grid on PhysioNet test subjects. Push:
 outputs/reve_set_bias_manifold_logits_q4_s7
 outputs/reve_set_bias_manifold_audit_s7
 ```
+
+## Known-prior and small-batch stress audit
+
+E10 resolves the main E9 ambiguity. For additive class bias, supervised NLL
+uses labels only through their empirical class proportions. A known balanced
+task prior can therefore replace labels in a convex prior-matching objective.
+E10 first verifies that identity, then asks whether nominal electrode topology
+is useful when only a small unlabeled target batch is available:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+make set-prior-stress
+```
+
+This stage is CPU-only and reuses the committed E9 validation logits. It tests
+random batches of 16--900 trials, balanced batches at the primary and stress
+sizes, and controlled 40%/70% single-class skews. Labels construct the
+balanced/skew stress batches and score the audit, but never fit a deployable
+target correction.
+
+The candidate shrinks known-prior bias toward a leave-one-electrode-out
+topology prediction. Its mixing weight is estimated only from non-target
+references. The predeclared primary condition is a random batch of 32 trials.
+Push:
+
+```text
+outputs/reve_set_prior_stress_audit_s7
+```
+
+The decision file is `prior_stress_summary.json`. It distinguishes a genuine
+small-batch benefit from the full-batch prior-matching identity and explicitly
+reports failure under class-prior confounding.

@@ -267,6 +267,30 @@ def _bias_manifold_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _prior_stress_command(args: argparse.Namespace) -> None:
+    from .prior_stress import analyze_prior_stress
+
+    result = analyze_prior_stress(
+        args.validation_predictions,
+        args.output_dir,
+        fit_subjects=args.fit_subjects,
+        evaluation_subjects=args.evaluation_subjects,
+        batch_sizes=args.batch_sizes,
+        primary_batch_size=args.primary_batch_size,
+        stress_batch_size=args.stress_batch_size,
+        n_resamples=args.batch_resamples,
+        seed=args.stress_seed,
+        ridge_alpha=args.ridge_alpha,
+        l2=args.l2,
+        bootstrap_resamples=args.bootstrap_resamples,
+        bootstrap_confidence=args.bootstrap_confidence,
+        minimum_rmse_reduction=args.minimum_rmse_reduction,
+        minimum_gap_reduction=args.minimum_gap_reduction,
+        max_mean_bacc_loss=args.max_mean_bacc_loss,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -478,6 +502,46 @@ def build_parser() -> argparse.ArgumentParser:
     manifold.add_argument("--minimum-recall-gap-reduction", type=float, default=0.30)
     manifold.add_argument("--max-mean-bacc-loss-vs-simple", type=float, default=0.01)
     manifold.set_defaults(handler=_bias_manifold_command)
+
+    prior_stress = subparsers.add_parser(
+        "prior-stress",
+        help="Stress known-prior calibration and topology shrinkage without test labels",
+    )
+    prior_stress.add_argument("--validation-predictions", required=True)
+    prior_stress.add_argument(
+        "--output-dir",
+        default="outputs/reve_set_prior_stress_audit_s7",
+    )
+    prior_stress.add_argument(
+        "--fit-subjects",
+        nargs="+",
+        type=int,
+        default=list(range(71, 81)),
+    )
+    prior_stress.add_argument(
+        "--evaluation-subjects",
+        nargs="+",
+        type=int,
+        default=list(range(81, 90)),
+    )
+    prior_stress.add_argument(
+        "--batch-sizes",
+        nargs="+",
+        type=int,
+        default=[16, 32, 64, 128, 256, 512, 900],
+    )
+    prior_stress.add_argument("--primary-batch-size", type=int, default=32)
+    prior_stress.add_argument("--stress-batch-size", type=int, default=128)
+    prior_stress.add_argument("--batch-resamples", type=int, default=20)
+    prior_stress.add_argument("--stress-seed", type=int, default=20260715)
+    prior_stress.add_argument("--ridge-alpha", type=float, default=1.0)
+    prior_stress.add_argument("--l2", type=float, default=1e-4)
+    prior_stress.add_argument("--bootstrap-resamples", type=int, default=2000)
+    prior_stress.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    prior_stress.add_argument("--minimum-rmse-reduction", type=float, default=0.20)
+    prior_stress.add_argument("--minimum-gap-reduction", type=float, default=0.10)
+    prior_stress.add_argument("--max-mean-bacc-loss", type=float, default=0.01)
+    prior_stress.set_defaults(handler=_prior_stress_command)
     return parser
 
 
