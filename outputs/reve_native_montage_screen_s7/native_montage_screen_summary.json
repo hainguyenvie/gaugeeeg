@@ -1,0 +1,37 @@
+{
+  "stage": "E7b native channel-subset validity screen",
+  "primary_view": "native16@cz",
+  "channel_policy": "select retained electrodes, reference within that montage, and remove other signals/coordinates",
+  "encoder_readout": "REVE released attention pooling plus sklearn linear probe",
+  "clean_gate_passed": false,
+  "clean_car_balanced_accuracy": 0.3988116383143614,
+  "chance_balanced_accuracy": 0.25,
+  "hard_shift_threshold": 0.03,
+  "hard_shift_detected": true,
+  "primary_balanced_accuracy": 0.2606270669871058,
+  "primary_gap_from_full_car": 0.1381845713272556,
+  "primary_prediction_noncollapse_passed": false,
+  "primary_prediction_entropy_normalized": 0.360990509626472,
+  "primary_largest_predicted_class_fraction": 0.8297282307265669,
+  "primary_subject_bootstrap": {
+    "n_subjects": 20,
+    "n_resamples": 10000,
+    "confidence": 0.95,
+    "point_gap": 0.1381845713272556,
+    "bootstrap_mean_gap": 0.138287816096704,
+    "ci_lower": 0.10212904240825896,
+    "ci_upper": 0.17403388919203325,
+    "probability_gap_positive": 1.0
+  },
+  "montage_only_drop": 0.14988702634096898,
+  "additional_reference_drop_within_montage": -0.011702455013713392,
+  "canonical_reference_residual_within_montage": 0.0,
+  "native_car_curve_32_16_8": [
+    0.2616450332964516,
+    0.2489246119733924,
+    0.2500012318305001
+  ],
+  "native_car_monotonicity_passed": false,
+  "benchmark_status": "clean_gate_failed",
+  "decision_rule": "Proceed to montage-aware learning only when the clean gate passes, the primary full-to-native gap is at least 0.03, and native predictions avoid the zero-fill collapse signature."
+}
