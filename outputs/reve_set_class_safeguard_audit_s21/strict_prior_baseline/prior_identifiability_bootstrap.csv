@@ -1,0 +1,7 @@
+metric,candidate,baseline,candidate_minus_baseline,ci_lower,ci_upper,confidence,n_resamples,n_repeats,n_reference_clusters,comparison
+target_bias_rmse,operator_confusion_shrinkage,fixed_topology_shrinkage,-0.016706117750633586,-0.02195142420733931,-0.012069573344119839,0.95,2000,20,32,primary_random
+balanced_accuracy,operator_confusion_shrinkage,fixed_topology_shrinkage,-0.00016214037698412685,-0.0005546591938405798,0.00028173120471014816,0.95,2000,20,32,primary_random
+max_class_recall_gap_to_car,operator_confusion_shrinkage,fixed_topology_shrinkage,-0.0016425120772946861,-0.0028075976427708784,-0.000559909312456866,0.95,2000,20,32,primary_random
+target_bias_rmse,operator_confusion_shrinkage,fixed_topology_shrinkage,-0.041830405902720524,-0.04739610320335791,-0.03595009732746465,0.95,2000,20,32,severe_skew
+balanced_accuracy,operator_confusion_shrinkage,fixed_topology_shrinkage,0.00024423834864561794,-0.00021772162711891825,0.0006771163571859897,0.95,2000,20,32,severe_skew
+max_class_recall_gap_to_car,operator_confusion_shrinkage,fixed_topology_shrinkage,-0.005374099594547965,-0.0070146855050897145,-0.003697094777109213,0.95,2000,20,32,severe_skew
