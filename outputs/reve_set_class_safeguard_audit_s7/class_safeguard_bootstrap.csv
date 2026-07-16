@@ -1,0 +1,14 @@
+metric,candidate,baseline,candidate_minus_baseline,ci_lower,ci_upper,confidence,n_resamples,n_repeats,n_reference_clusters,comparison
+target_bias_rmse,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.03416999848666821,-0.054966755593352803,-0.015152712786534682,0.95,2000,20,32,primary_random
+balanced_accuracy,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.0010964997412008105,-0.0020916108630952258,4.252764568237821e-05,0.95,2000,20,32,primary_random
+max_class_recall_gap_to_car,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.012066565303657652,-0.01650554665933398,-0.007835215018978567,0.95,2000,20,32,primary_random
+target_bias_rmse,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.10512661645181605,-0.13682515559662387,-0.06871297941091492,0.95,2000,20,32,balanced_stress_size
+balanced_accuracy,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.002580335576259476,-0.004205924276979802,-0.0010399369581392183,0.95,2000,20,32,balanced_stress_size
+max_class_recall_gap_to_car,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.030009758885438192,-0.03852504960317456,-0.02129055329106275,0.95,2000,20,32,balanced_stress_size
+target_bias_rmse,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.14505016572559834,-0.17290058332726124,-0.11374775499643436,0.95,2000,20,32,severe_skew
+balanced_accuracy,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.0013534758615855618,-0.002790373176274578,3.789495516845134e-05,0.95,2000,20,32,severe_skew
+max_class_recall_gap_to_car,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.03341515161318146,-0.0405262418316511,-0.025763220998317758,0.95,2000,20,32,severe_skew
+target_bias_rmse,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.31421299321733576,-0.35362249112717287,-0.2724559490854574,0.95,2000,20,32,severe_left_fist
+target_bias_rmse,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.004473124139952861,-0.026583603919378907,0.020583104627357414,0.95,2000,20,32,severe_right_fist
+target_bias_rmse,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.14916011161543272,-0.17991865150913208,-0.11681145414825114,0.95,2000,20,32,severe_both_fists
+target_bias_rmse,class_operator_trust_safeguard,fixed_topology_shrinkage,-0.11235443392967212,-0.15005045612454074,-0.07536480819804352,0.95,2000,20,32,severe_both_feet
