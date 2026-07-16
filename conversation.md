@@ -626,3 +626,25 @@ the working hypothesis or paper direction.
   Aggregation bootstraps probe seed, batch repeat, and held-reference identity.
   A pass advances only the mean-method hypothesis to an external open dataset;
   class-uniform evidence cannot be restored by E14.
+
+## 2026-07-16 — E14 seed-42 known-prior optimizer repair
+
+- The user pushed complete E14 audit logits for untouched probe seeds 21 and
+  42, plus the completed strict E12 audit for seed 21. Seed 42 reached the CPU
+  audit but stopped inside `fit_known_prior_bias`.
+- Reproduction on the committed seed-42 CSV localized the first failure to
+  `native16@Cz`, a random `n=16` batch, repeat 0. The soft-confusion prior was
+  `[0, 0.610154, 0.200852, 0.188993]`, so one valid estimated class mass was
+  exactly zero.
+- The Newton solver's objective already had positive L2 regularization, which
+  makes this solution finite. However, a legacy `[-5, 5]` hard clip forced the
+  first free bias to `-5`; the clipped Armijo step could not satisfy the
+  unconstrained gradient tolerance and produced a false line-search failure.
+- The hard clip was removed while retaining stable log-sum-exp evaluation,
+  stable softmax, positive L2, and backtracking. A regression test now requires
+  a zero-mass class to converge beyond the old boundary.
+- The entire seed-42 E12 pipeline was replayed on the exact 88,435-row committed
+  prediction file and completed without another optimization failure. The
+  user's existing seed-21 audit and both trained probe-logit runs remain
+  reusable; only the missing seed-42 E12 audit and final E14 aggregation need
+  to run after pulling the fix.

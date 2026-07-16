@@ -28,6 +28,18 @@ class PriorStressTests(unittest.TestCase):
             rtol=0.0,
         )
 
+    def test_known_prior_zero_mass_class_can_cross_legacy_bias_bound(self):
+        logits = np.zeros((16, 4), dtype=np.float64)
+        logits[:, 0] = 1.0
+        prior = np.asarray([0.0, 0.61, 0.20, 0.19], dtype=np.float64)
+
+        fitted = fit_known_prior_bias(logits, prior)
+
+        self.assertTrue(fitted.success, fitted.message)
+        self.assertLess(fitted.parameters[0], -5.0)
+        self.assertTrue(np.isfinite(fitted.parameters).all())
+        self.assertTrue(np.isfinite(fitted.objective))
+
     def test_cpu_only_prior_stress_writes_predeclared_suite(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

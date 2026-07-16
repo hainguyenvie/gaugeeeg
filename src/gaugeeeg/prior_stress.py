@@ -112,7 +112,14 @@ def fit_known_prior_bias(
         scale = 1.0
         accepted = False
         for _ in range(30):
-            candidate = np.clip(free - scale * step, -5.0, 5.0)
+            # The estimated prior may legitimately put zero mass on a class.
+            # With positive L2 regularization the optimum is still finite, but
+            # it can lie outside the legacy calibration bound of [-5, 5].  A
+            # hard clip makes the Armijo test compare against an infeasible
+            # Newton direction and reports a false line-search failure at the
+            # boundary.  The objective and softmax are numerically stable, so
+            # let backtracking control the unbounded Newton step instead.
+            candidate = free - scale * step
             candidate_objective = objective(candidate)
             if candidate_objective <= current_objective - 1e-4 * scale * directional_decrease:
                 free = candidate
