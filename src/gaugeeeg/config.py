@@ -32,8 +32,19 @@ def validate_config(config: dict[str, Any]) -> None:
     }
     if not all(splits.values()):
         raise ValueError("Train, validation, and test subject lists must be non-empty")
-    if splits["train"] & splits["val"] or splits["train"] & splits["test"] or splits["val"] & splits["test"]:
-        raise ValueError("Subject splits must be disjoint")
+    if "audit_subjects" in data:
+        splits["audit"] = set(data["audit_subjects"])
+        if not splits["audit"]:
+            raise ValueError("Audit subject list must be non-empty when provided")
+    split_names = list(splits)
+    overlap = [
+        (left, right)
+        for index, left in enumerate(split_names)
+        for right in split_names[index + 1 :]
+        if splits[left] & splits[right]
+    ]
+    if overlap:
+        raise ValueError(f"Subject splits must be pairwise disjoint: {overlap}")
     subjects = set().union(*splits.values())
     if min(subjects) < 1 or max(subjects) > 109:
         raise ValueError("PhysioNetMI subject IDs must be in [1, 109]")
@@ -70,6 +81,15 @@ def validate_config(config: dict[str, Any]) -> None:
         raise ValueError(f"{objective} requires at least two training_views")
     if float(experiment.get("consistency_weight", 0.0)) < 0.0:
         raise ValueError("consistency_weight must be non-negative")
+    if experiment.get("validation_predictions_only", False):
+        if not experiment.get("save_validation_predictions", False):
+            raise ValueError(
+                "validation_predictions_only requires save_validation_predictions"
+            )
+        if len(experiment.get("defenses", ["none"])) != 1:
+            raise ValueError(
+                "validation_predictions_only requires exactly one defense"
+            )
 
 
 def with_overrides(

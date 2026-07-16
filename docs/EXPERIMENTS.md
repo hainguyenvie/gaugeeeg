@@ -26,6 +26,7 @@ sanity check fails.
 | E11 | Cross-subject prior identifiability | `make set-prior-identifiability` | Mean-vs-class-uniform robustness decision |
 | E12 | Source-only class/operator safeguard | `make set-class-safeguard` | Strict-split class-safety confirmation decision |
 | E13 | Post-hoc strongest-baseline audit | `make set-strong-baseline-audit` | Mean-only vs class-uniform advancement decision |
+| E14 | Untouched-probe-seed confirmation | `make set-probe-seed-confirmation` | Frozen mean-method multi-seed decision |
 
 ## E0 acceptance
 
@@ -411,3 +412,33 @@ Balanced and severe mean intervals were below zero against both baselines.
 Right-fist-dominant E12 RMSE was worse than strict E11 by 0.0182, with interval
 [0.0006, 0.0361]. E13 therefore advances only the mean-method hypothesis to
 new probe seeds and rejects advancement of the current class-uniform claim.
+
+## E14 untouched-probe-seed confirmation protocol
+
+- Treat E13 seed 7 as exploratory because its strongest-baseline rule was
+  written post hoc. Exclude seed 7 from every confirmatory statistic.
+- Repair probe-selection overlap before training new seeds. Train the q4 probe
+  on subjects 1--60, early-stop on 61--70, emit the downstream audit grid for
+  71--89, and leave PhysioNet test subjects 90--109 entirely unscored.
+- Freeze q4 architecture, reference seed 7, E12 source/adaptation/evaluation
+  split, controlled batch selections, all method hyperparameters, strong
+  baselines, regimes, metrics, tolerances, and the E13 decision rule.
+- Run untouched probe seeds 21 and 42. Changing `CONFIRMATION_SEEDS` is allowed
+  only to add seeds before seeing their outputs, never to replace an
+  unfavorable completed seed.
+- Require lower mean RMSE against both strict E11 and topology for every new
+  seed under random `n=32`, balanced `n=128`, and mean severe skew. Then require
+  crossed seed/repeat/reference 95% intervals below zero for all six
+  comparisons.
+- Require hierarchical BAcc and maximum-recall-gap noninferiority within the
+  frozen 0.01 margins and no detected mean harm. Report every class direction,
+  but do not use class results to tune or revive the already rejected
+  class-uniform claim.
+- A pass licenses evaluation on an external open EEG dataset. A failure
+  returns the method to source-only redesign; target audit labels cannot choose
+  a new cap or threshold.
+
+The five E14 output directories include two validation-only logit runs, two
+complete E12 runs with nested strict-E11 controls, and one aggregate decision.
+The aggregate writes a run manifest, per-seed comparisons, hierarchical
+comparisons, a class diagnostic, and `probe_seed_confirmation_summary.json`.

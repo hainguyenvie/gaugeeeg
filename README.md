@@ -719,3 +719,54 @@ outputs/reve_set_strong_baseline_audit_s7
 
 The decision file is `strong_baseline_summary.json`. Do not rerun or modify
 E12 while producing this audit.
+
+## Untouched-probe-seed mean-method confirmation
+
+E14 repairs one more protocol limitation before spending compute on repeated
+seeds. The old q4 probe used subjects 71--89 for early stopping, while E12
+later divided the same subjects into source, adaptation, and evaluation sets.
+This does not invalidate the within-run comparison among E12, E11, and
+topology, but it prevents seed 7 from serving as independent confirmation.
+
+E14 freezes the E13 rule and uses a four-way subject split:
+
+- probe training: subjects 1--60;
+- probe early stopping: subjects 61--70;
+- downstream source/adaptation/evaluation audit: subjects 71--89; and
+- reserved PhysioNet test: subjects 90--109, never fitted or scored.
+
+Run the two untouched default probe seeds, 21 and 42:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+make set-probe-seed-confirmation
+```
+
+Set `DEVICE=cuda:1` to use another GPU. The existing feature grid for audit
+subjects is reused; the first E14 run still has to encode the new CAR-only
+probe-train and probe-validation splits. It then trains two q4 probes, runs
+strict E12 for each seed on CPU, and performs a crossed hierarchical bootstrap
+over probe seed, batch repeat, and held-reference identity. Seed 7 is excluded
+from all confirmatory statistics.
+
+Push these complete directories:
+
+```text
+outputs/reve_set_probe_confirmation_logits_q4_s21
+outputs/reve_set_probe_confirmation_logits_q4_s42
+outputs/reve_set_class_safeguard_audit_s21
+outputs/reve_set_class_safeguard_audit_s42
+outputs/reve_set_probe_seed_confirmation
+```
+
+E14 disables probe checkpoint saving, so the logit directories contain no
+large `.pt` files. The main decision file is
+`probe_seed_confirmation_summary.json`. A positive result requires every new
+seed to improve mean RMSE against both strict E11 and topology in all three
+frozen regimes, hierarchical RMSE intervals below zero, task-metric
+noninferiority, and no material mean harm. Class-wise results remain a
+falsification diagnostic and cannot revive the current class-uniform claim.
+Even a pass advances the frozen mean method only to an external open EEG
+dataset; two untouched seeds on one dataset are not a paper-level claim.

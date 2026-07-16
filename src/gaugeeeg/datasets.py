@@ -41,11 +41,13 @@ BILATERAL_RUNS = {6, 10, 14}
 
 
 def all_subjects(data_config: dict[str, Any]) -> list[int]:
-    return sorted(
+    subjects = (
         set(data_config["train_subjects"])
         | set(data_config["val_subjects"])
         | set(data_config["test_subjects"])
     )
+    subjects |= set(data_config.get("audit_subjects", []))
+    return sorted(subjects)
 
 
 def _cache_key(data_config: dict[str, Any]) -> str:

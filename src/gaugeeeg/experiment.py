@@ -198,12 +198,25 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "val": [int(v) for v in data_config["val_subjects"]],
         "test": [int(v) for v in data_config["test_subjects"]],
     }
+    if data_config.get("audit_subjects"):
+        splits["audit"] = [int(v) for v in data_config["audit_subjects"]]
+    prediction_split = "audit" if "audit" in splits else "val"
+    validation_predictions_only = bool(
+        experiment.get("validation_predictions_only", False)
+    )
+    if validation_predictions_only and not experiment.get(
+        "save_validation_predictions", False
+    ):
+        raise ValueError(
+            "validation_predictions_only requires save_validation_predictions"
+        )
     expected_classes = len(dataset.label_names)
     rows: list[dict[str, Any]] = []
     prediction_frames: list[pd.DataFrame] = []
     validation_prediction_frames: list[pd.DataFrame] = []
     subject_rows: list[dict[str, Any]] = []
     bootstrap_rows: list[dict[str, Any]] = []
+    validation_only_rows: list[dict[str, Any]] = []
     train_view = str(experiment.get("train_view", "car"))
     training_views = [str(view) for view in experiment.get("training_views", [train_view])]
     if not training_views or training_views[0].casefold() != "car":
@@ -350,57 +363,78 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             validation_prediction_disagreement = probe.validation_prediction_disagreement
             pd.DataFrame(probe.history).to_csv(output_dir / f"probe_history_{defense}.csv", index=False)
 
-            try:
-                import torch
+            if bool(experiment.get("save_probe_checkpoint", True)):
+                try:
+                    import torch
 
-                torch.save(
-                    {
-                        "model_state_dict": predictor.module.state_dict(),
-                        "selected_epoch": selected_epoch,
-                        "validation_balanced_accuracy": validation_score,
-                        "validation_consistency_loss": validation_consistency_loss,
-                        "validation_prediction_disagreement": validation_prediction_disagreement,
-                        "probe": probe_name,
-                        "probe_seed": probe_seed,
-                        "reference_seed": reference_seed,
-                        "strict_determinism": strict_determinism,
-                        "probe_objective": probe_objective,
-                        "training_views": training_views,
-                        "consistency_weight": consistency_weight,
-                        "set_queries": int(experiment.get("set_queries", 0)),
-                        "set_heads": int(experiment.get("set_heads", 0)),
-                    },
-                    output_dir / f"probe_best_{defense}.pt",
-                )
-            except ImportError:
-                pass
+                    torch.save(
+                        {
+                            "model_state_dict": predictor.module.state_dict(),
+                            "selected_epoch": selected_epoch,
+                            "validation_balanced_accuracy": validation_score,
+                            "validation_consistency_loss": validation_consistency_loss,
+                            "validation_prediction_disagreement": (
+                                validation_prediction_disagreement
+                            ),
+                            "probe": probe_name,
+                            "probe_seed": probe_seed,
+                            "reference_seed": reference_seed,
+                            "strict_determinism": strict_determinism,
+                            "probe_objective": probe_objective,
+                            "training_views": training_views,
+                            "consistency_weight": consistency_weight,
+                            "set_queries": int(experiment.get("set_queries", 0)),
+                            "set_heads": int(experiment.get("set_heads", 0)),
+                        },
+                        output_dir / f"probe_best_{defense}.pt",
+                    )
+                except ImportError:
+                    pass
         else:
             raise ValueError(f"Unknown probe: {probe_name}")
 
         if bool(experiment.get("save_validation_predictions", False)):
-            validation_feature_by_view = {
-                training_view.casefold(): features
-                for training_view, features in zip(training_views, val_features, strict=True)
-            }
-            validation_subjects = dataset.subset(splits["val"]).subjects
-            if validation_subjects.size != val_y.size:
-                raise RuntimeError("Validation subject metadata is not aligned with validation labels")
+            prediction_subject_ids = splits[prediction_split]
+            prediction_dataset = dataset.subset(prediction_subject_ids)
+            prediction_subjects = prediction_dataset.subjects
+            prediction_labels = prediction_dataset.y
+            prediction_cache_namespace = str(
+                experiment.get(
+                    "validation_prediction_cache_namespace",
+                    prediction_split,
+                )
+            )
+            if prediction_split == "val":
+                validation_feature_by_view = {
+                    training_view.casefold(): features
+                    for training_view, features in zip(
+                        training_views, val_features, strict=True
+                    )
+                }
+                if not np.array_equal(prediction_labels, val_y):
+                    raise RuntimeError(
+                        "Validation prediction labels do not match probe validation"
+                    )
+            else:
+                validation_feature_by_view = {}
             for view in validation_prediction_views:
                 key = view.casefold()
                 if key not in validation_feature_by_view:
                     features, labels = _extract_features(
                         dataset,
                         encoder=encoder,
-                        split_name="val",
-                        subject_ids=splits["val"],
+                        split_name=prediction_cache_namespace,
+                        subject_ids=prediction_subject_ids,
                         view=view,
                         defense=defense,
                         seed=reference_seed,
                         cache_dir=feature_cache,
                         force_recompute=force_recompute,
                     )
-                    if not np.array_equal(val_y, labels):
-                        raise RuntimeError("Validation label order changed across reference views")
+                    if not np.array_equal(prediction_labels, labels):
+                        raise RuntimeError(
+                            "Prediction label order changed across reference views"
+                        )
                     validation_feature_by_view[key] = features
                 prediction, probability, logits = _predict_outputs(
                     predictor,
@@ -411,16 +445,31 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                         probe_seed=probe_seed,
                         reference_seed=reference_seed,
                         defense=defense,
-                        split="validation",
+                        split=prediction_split,
                         view=view,
-                        subjects=validation_subjects,
-                        labels=val_y,
+                        subjects=prediction_subjects,
+                        labels=prediction_labels,
                         predictions=prediction,
                         probabilities=probability,
                         logits=logits,
                         label_names=dataset.label_names,
                     )
                 )
+
+            validation_only_rows.append(
+                {
+                    "probe_seed": probe_seed,
+                    "reference_seed": reference_seed,
+                    "defense": defense,
+                    "probe_validation_balanced_accuracy": validation_score,
+                    "selected_epoch": selected_epoch,
+                    "prediction_split": prediction_split,
+                    "n_prediction_trials": int(prediction_labels.size),
+                }
+            )
+
+        if validation_predictions_only:
+            continue
 
         test_features: dict[str, np.ndarray] = {}
         test_labels: np.ndarray | None = None
@@ -571,6 +620,71 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                         "ci_excludes_zero": bool(bootstrap["ci_lower"] > 0.0),
                     }
                 )
+
+    if validation_predictions_only:
+        output_predictions = pd.concat(
+            validation_prediction_frames, ignore_index=True
+        )
+        output_predictions.to_csv(
+            output_dir / "validation_predictions.csv", index=False
+        )
+        results = pd.DataFrame(validation_only_rows)
+        results.to_csv(output_dir / "metrics.csv", index=False)
+        subject_sets = {name: set(values) for name, values in splits.items()}
+        pairwise_disjoint = all(
+            not subject_sets[left] & subject_sets[right]
+            for index, left in enumerate(subject_sets)
+            for right in list(subject_sets)[index + 1 :]
+        )
+        summary = {
+            "encoder": encoder.name,
+            "seed": probe_seed,
+            "probe_seed": probe_seed,
+            "reference_seed": reference_seed,
+            "strict_determinism": strict_determinism,
+            "probe": probe_name,
+            "probe_objective": probe_objective,
+            "set_queries": int(experiment.get("set_queries", 0)),
+            "set_heads": int(experiment.get("set_heads", 0)),
+            "training_views": training_views,
+            "validation_prediction_views": validation_prediction_views,
+            "validation_predictions_only": True,
+            "prediction_split": prediction_split,
+            "validation_prediction_cache_namespace": str(
+                experiment.get(
+                    "validation_prediction_cache_namespace",
+                    prediction_split,
+                )
+            ),
+            "train_subjects": splits["train"],
+            "probe_validation_subjects": splits["val"],
+            "audit_subjects": splits[prediction_split],
+            "reserved_test_subjects": splits["test"],
+            "all_subject_splits_pairwise_disjoint": pairwise_disjoint,
+            "probe_validation_audit_subjects_disjoint": not bool(
+                subject_sets["val"] & subject_sets[prediction_split]
+            ),
+            "physionet_test_subjects_used_for_fitting_or_scoring": False,
+            "validation_balanced_accuracy": float(
+                validation_only_rows[0]["probe_validation_balanced_accuracy"]
+            ),
+            "selected_epoch": int(validation_only_rows[0]["selected_epoch"]),
+            "n_prediction_trials": int(
+                validation_only_rows[0]["n_prediction_trials"]
+            ),
+            "n_channels": len(dataset.channel_names),
+            "sfreq": dataset.sfreq,
+            "feature_cache_dir": str(feature_cache),
+            "metrics_path": str(output_dir / "metrics.csv"),
+            "validation_predictions_path": str(
+                output_dir / "validation_predictions.csv"
+            ),
+        }
+        with (output_dir / "summary.json").open(
+            "w", encoding="utf-8"
+        ) as handle:
+            json.dump(summary, handle, indent=2)
+        return results
 
     results = pd.DataFrame(rows)
     results.to_csv(output_dir / "metrics.csv", index=False)

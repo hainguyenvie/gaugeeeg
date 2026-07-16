@@ -380,6 +380,37 @@ def _strong_baseline_command(args: argparse.Namespace) -> None:
     print(selected.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _probe_seed_confirmation_command(args: argparse.Namespace) -> None:
+    from .probe_seed_confirmation import analyze_probe_seed_confirmation
+
+    result = analyze_probe_seed_confirmation(
+        args.frozen_e13_summary,
+        args.logit_runs,
+        args.e12_runs,
+        args.output_dir,
+        exploratory_probe_seed=args.exploratory_probe_seed,
+        bootstrap_resamples=args.bootstrap_resamples,
+        bootstrap_confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+        max_bacc_loss=args.max_bacc_loss,
+        max_gap_increase=args.max_gap_increase,
+    )
+    selected = result.loc[
+        result["comparison"].isin(
+            ["primary_random", "balanced_stress_size", "severe_skew"]
+        )
+        & (result["metric"] == "target_bias_rmse"),
+        [
+            "comparison",
+            "baseline",
+            "candidate_minus_baseline",
+            "ci_lower",
+            "ci_upper",
+        ],
+    ]
+    print(selected.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -770,6 +801,55 @@ def build_parser() -> argparse.ArgumentParser:
     strong_baseline.add_argument("--max-bacc-loss", type=float, default=0.01)
     strong_baseline.add_argument("--max-gap-increase", type=float, default=0.01)
     strong_baseline.set_defaults(handler=_strong_baseline_command)
+
+    probe_confirmation = subparsers.add_parser(
+        "confirm-probe-seeds",
+        help="Confirm the frozen E13 mean gate on untouched probe seeds",
+    )
+    probe_confirmation.add_argument(
+        "--frozen-e13-summary",
+        default=(
+            "outputs/reve_set_strong_baseline_audit_s7/"
+            "strong_baseline_summary.json"
+        ),
+    )
+    probe_confirmation.add_argument(
+        "--logit-runs",
+        nargs="+",
+        default=[
+            "outputs/reve_set_probe_confirmation_logits_q4_s21",
+            "outputs/reve_set_probe_confirmation_logits_q4_s42",
+        ],
+    )
+    probe_confirmation.add_argument(
+        "--e12-runs",
+        nargs="+",
+        default=[
+            "outputs/reve_set_class_safeguard_audit_s21",
+            "outputs/reve_set_class_safeguard_audit_s42",
+        ],
+    )
+    probe_confirmation.add_argument(
+        "--output-dir",
+        default="outputs/reve_set_probe_seed_confirmation",
+    )
+    probe_confirmation.add_argument(
+        "--exploratory-probe-seed", type=int, default=7
+    )
+    probe_confirmation.add_argument(
+        "--bootstrap-resamples", type=int, default=10000
+    )
+    probe_confirmation.add_argument(
+        "--bootstrap-confidence", type=float, default=0.95
+    )
+    probe_confirmation.add_argument(
+        "--bootstrap-seed", type=int, default=20260720
+    )
+    probe_confirmation.add_argument("--max-bacc-loss", type=float, default=0.01)
+    probe_confirmation.add_argument(
+        "--max-gap-increase", type=float, default=0.01
+    )
+    probe_confirmation.set_defaults(handler=_probe_seed_confirmation_command)
     return parser
 
 

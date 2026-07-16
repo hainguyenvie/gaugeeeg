@@ -601,3 +601,28 @@ the working hypothesis or paper direction.
   not advance the current class-uniform method or paper claim. Since the E13
   rule follows seed-7 inspection, it is falsification-only; it cannot convert
   the existing result into confirmatory evidence.
+
+## 2026-07-16 — E13 reproduction and E14 protocol repair
+
+- The user pushed commit `f1699fa` with exactly the three expected E13 files
+  and no code changes. The results reproduced the pre-push audit numerically.
+- Mean E12 RMSE improved against strict E11 and topology under random,
+  balanced, and severe conditions. The primary strict-E11 interval crossed
+  zero, while balanced and severe intervals were below zero against both
+  baselines. Mean task-metric noninferiority passed.
+- The current class-uniform method remains rejected. Right-fist-dominant RMSE
+  was worse than strict E11 by 0.0182 with interval [0.0006, 0.0361]. The
+  both-fists recall-gap comparison against topology also failed the frozen
+  noninferiority check.
+- Before launching repeated seeds, code review found that the old q4 probe used
+  subjects 71--89 for early stopping and E12 reused 71--89 for its downstream
+  source/adaptation/evaluation audit. This preserves fairness of the paired
+  E12/E11/topology comparison, but makes seed 7 exploratory rather than
+  independently confirmatory.
+- E14 introduces a four-way split: probe train 1--60, probe validation 61--70,
+  audit 71--89, and reserved test 90--109. A validation-only run mode emits
+  audit logits without fitting or scoring test subjects.
+- The frozen E13 gate is applied only to untouched probe seeds 21 and 42.
+  Aggregation bootstraps probe seed, batch repeat, and held-reference identity.
+  A pass advances only the mean-method hypothesis to an external open dataset;
+  class-uniform evidence cannot be restored by E14.

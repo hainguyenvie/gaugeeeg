@@ -429,6 +429,15 @@ def analyze_class_safeguard(
     )
 
     frame, class_names = _load_predictions(validation_predictions)
+    observed_probe_seeds = (
+        sorted(frame["probe_seed"].astype(int).unique().tolist())
+        if "probe_seed" in frame
+        else []
+    )
+    if len(observed_probe_seeds) > 1:
+        raise ValueError(
+            "E12 requires predictions from exactly one probe seed per run"
+        )
     frame = frame.loc[
         frame["test_view"].astype(str).str.casefold().str.startswith("native")
     ].copy()
@@ -782,6 +791,10 @@ def analyze_class_safeguard(
     )
     summary = {
         "stage": "E12 source-only class/operator trust safeguard",
+        "validation_predictions_path": str(Path(validation_predictions)),
+        "probe_seed": (
+            observed_probe_seeds[0] if observed_probe_seeds else None
+        ),
         "source_subjects": sorted(source_set),
         "adaptation_subjects": sorted(adaptation_set),
         "evaluation_subjects": sorted(evaluation_set),

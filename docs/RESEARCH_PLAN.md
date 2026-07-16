@@ -168,6 +168,15 @@ new-seed confirmation of the mean-only claim. The present class-wise cap cannot
 support a class-uniform novelty claim without redesign on source data followed
 by validation on untouched external data.
 
+Before that confirmation, E14 protocol review found that the old q4 probe was
+early-stopped using subjects 71--89, the same pool later divided by E12 into
+source, adaptation, and evaluation subjects. Thus E12/E13 remain valid paired
+diagnostics among methods sharing one frozen probe, but seed 7 cannot count as
+independent confirmation. E14 repairs this with probe train 1--60, probe
+validation 61--70, downstream audit 71--89, and reserved test 90--109. Its
+confirmatory analysis uses only unseen probe seeds 21 and 42 under the frozen
+E13 mean-only rule.
+
 ## 6. Core hypotheses
 
 - **H1:** Frozen REVE embeddings and linear-probe performance change under
@@ -217,3 +226,7 @@ also produce no meaningful drift or downstream loss.
 - E13's strongest-baseline rule was defined after inspecting seed 7. It may
   eliminate unsupported claims, but only new probe seeds and an untouched
   external dataset can provide confirmatory evidence.
+- E12/E13 seed 7 shares its probe early-stopping pool with the downstream audit
+  pool. It is retained for hypothesis formation and paired failure analysis,
+  but excluded from E14 confirmation. E14's four-way split prevents this
+  leakage for new seeds.
