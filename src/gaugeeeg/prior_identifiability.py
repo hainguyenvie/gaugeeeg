@@ -305,10 +305,10 @@ def analyze_prior_identifiability(
         raise ValueError("Prior-model and adaptation subjects must be disjoint")
     if subject_groups["evaluation"] & subject_groups["topology"]:
         raise ValueError("Evaluation and topology-training subjects must be disjoint")
-    if not (
-        subject_groups["prior_model"] | subject_groups["adaptation"]
-    ) <= subject_groups["topology"]:
-        raise ValueError("Topology subjects must contain prior-model and adaptation subjects")
+    if subject_groups["evaluation"] & subject_groups["adaptation"]:
+        raise ValueError("Evaluation and adaptation subjects must be disjoint")
+    if not subject_groups["prior_model"] <= subject_groups["topology"]:
+        raise ValueError("Topology subjects must contain prior-model subjects")
     if ridge_alpha <= 0.0 or l2 < 0.0:
         raise ValueError("Invalid ridge or calibration regularization")
     if confusion_regularization <= 0.0 or weak_confusion_regularization < 0.0:
@@ -665,7 +665,19 @@ def analyze_prior_identifiability(
                         np.sqrt(np.mean(np.square(candidate_bias - oracle_bias[target])))
                     ),
                     "prior_match_weight": prior_weight,
+                    "topology_bias": json.dumps(topology_bias.tolist()),
+                    "uniform_bias": json.dumps(uniform_fit.parameters.tolist()),
+                    "fixed_bias": json.dumps(fixed_bias.tolist()),
                     "candidate_bias": json.dumps(candidate_bias.tolist()),
+                    "oracle_bias_audit_only": json.dumps(
+                        oracle_bias[target].tolist()
+                    ),
+                    "candidate_prior_displacement_from_nominal": float(
+                        np.linalg.norm(candidate_prior - nominal_prior)
+                    ),
+                    "candidate_update_norm_from_topology": float(
+                        np.linalg.norm(candidate_bias - topology_bias)
+                    ),
                     "target_reference_labels_used_for_candidate": False,
                 }
             )
@@ -987,8 +999,14 @@ def analyze_prior_identifiability(
         "prior_model_adaptation_subjects_disjoint": not bool(
             subject_groups["prior_model"] & subject_groups["adaptation"]
         ),
+        "topology_adaptation_subjects_disjoint": not bool(
+            subject_groups["topology"] & subject_groups["adaptation"]
+        ),
         "topology_evaluation_subjects_disjoint": not bool(
             subject_groups["topology"] & subject_groups["evaluation"]
+        ),
+        "adaptation_evaluation_subjects_disjoint": not bool(
+            subject_groups["adaptation"] & subject_groups["evaluation"]
         ),
         "source_and_target_batch_seeds_disjoint": source_seed != adaptation_seed,
         "physionet_test_subjects_used": False,

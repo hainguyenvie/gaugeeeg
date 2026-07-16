@@ -321,6 +321,37 @@ def _prior_identifiability_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _class_safeguard_command(args: argparse.Namespace) -> None:
+    from .class_safeguard import analyze_class_safeguard
+
+    result = analyze_class_safeguard(
+        args.validation_predictions,
+        args.output_dir,
+        source_subjects=args.source_subjects,
+        adaptation_subjects=args.adaptation_subjects,
+        evaluation_subjects=args.evaluation_subjects,
+        batch_sizes=args.batch_sizes,
+        primary_batch_size=args.primary_batch_size,
+        stress_batch_size=args.stress_batch_size,
+        batch_resamples=args.batch_resamples,
+        source_gate_resamples=args.source_gate_resamples,
+        source_seed=args.source_seed,
+        adaptation_seed=args.adaptation_seed,
+        gate_seed=args.gate_seed,
+        ridge_alpha=args.ridge_alpha,
+        l2=args.l2,
+        confusion_regularization=args.confusion_regularization,
+        cap_ridge=args.cap_ridge,
+        bootstrap_resamples=args.bootstrap_resamples,
+        bootstrap_confidence=args.bootstrap_confidence,
+        minimum_severe_rmse_reduction=args.minimum_severe_rmse_reduction,
+        max_primary_rmse_increase=args.max_primary_rmse_increase,
+        max_mean_bacc_loss=args.max_mean_bacc_loss,
+        max_mean_gap_increase=args.max_mean_gap_increase,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -586,7 +617,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--topology-subjects",
         nargs="+",
         type=int,
-        default=list(range(71, 81)),
+        default=list(range(71, 76)),
     )
     identifiability.add_argument(
         "--prior-model-subjects",
@@ -636,6 +667,62 @@ def build_parser() -> argparse.ArgumentParser:
     identifiability.add_argument("--max-mean-bacc-loss", type=float, default=0.01)
     identifiability.add_argument("--max-mean-gap-increase", type=float, default=0.01)
     identifiability.set_defaults(handler=_prior_identifiability_command)
+
+    safeguard = subparsers.add_parser(
+        "class-safeguard",
+        help="Fit a source-only class/operator trust safeguard and audit it",
+    )
+    safeguard.add_argument("--validation-predictions", required=True)
+    safeguard.add_argument(
+        "--output-dir",
+        default="outputs/reve_set_class_safeguard_audit_s7",
+    )
+    safeguard.add_argument(
+        "--source-subjects",
+        nargs="+",
+        type=int,
+        default=list(range(71, 76)),
+    )
+    safeguard.add_argument(
+        "--adaptation-subjects",
+        nargs="+",
+        type=int,
+        default=list(range(76, 81)),
+    )
+    safeguard.add_argument(
+        "--evaluation-subjects",
+        nargs="+",
+        type=int,
+        default=list(range(81, 90)),
+    )
+    safeguard.add_argument(
+        "--batch-sizes",
+        nargs="+",
+        type=int,
+        default=[16, 32, 64, 128, 256, 450],
+    )
+    safeguard.add_argument("--primary-batch-size", type=int, default=32)
+    safeguard.add_argument("--stress-batch-size", type=int, default=128)
+    safeguard.add_argument("--batch-resamples", type=int, default=20)
+    safeguard.add_argument("--source-gate-resamples", type=int, default=5)
+    safeguard.add_argument("--source-seed", type=int, default=20260716)
+    safeguard.add_argument("--adaptation-seed", type=int, default=20260717)
+    safeguard.add_argument("--gate-seed", type=int, default=20260718)
+    safeguard.add_argument("--ridge-alpha", type=float, default=1.0)
+    safeguard.add_argument("--l2", type=float, default=1e-4)
+    safeguard.add_argument("--confusion-regularization", type=float, default=1.0)
+    safeguard.add_argument("--cap-ridge", type=float, default=1e-8)
+    safeguard.add_argument("--bootstrap-resamples", type=int, default=2000)
+    safeguard.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    safeguard.add_argument(
+        "--max-primary-rmse-increase", type=float, default=0.05
+    )
+    safeguard.add_argument(
+        "--minimum-severe-rmse-reduction", type=float, default=0.05
+    )
+    safeguard.add_argument("--max-mean-bacc-loss", type=float, default=0.01)
+    safeguard.add_argument("--max-mean-gap-increase", type=float, default=0.01)
+    safeguard.set_defaults(handler=_class_safeguard_command)
     return parser
 
 

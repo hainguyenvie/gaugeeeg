@@ -24,6 +24,7 @@ sanity check fails.
 | E9 | Reference-bias manifold audit | `make set-bias-manifold` | Unseen-electrode bias predictability |
 | E10 | Known-prior/small-batch stress | `make set-prior-stress` | Prior confounding and topology-shrinkage decision |
 | E11 | Cross-subject prior identifiability | `make set-prior-identifiability` | Mean-vs-class-uniform robustness decision |
+| E12 | Source-only class/operator safeguard | `make set-class-safeguard` | Strict-split class-safety confirmation decision |
 
 ## E0 acceptance
 
@@ -345,3 +346,36 @@ paired interval [-0.0219, -0.0113]) but not class-uniform robustness. Three of
 four dominant-class directions improved; right-fist-dominant RMSE changed from
 0.1452 to 0.1482. Therefore E11 is a diagnostic result, and the next method
 must add a class-conditional safeguard before a paper-level method claim.
+
+The archived E11 run used subjects 76--80 in both topology fitting and target
+adaptation. Treat those numbers as an exploratory failure analysis only. The
+current E11 command and E12's nested control fit topology on subjects 71--75,
+adapt on 76--80, and evaluate on 81--89.
+
+## E12 source-only class/operator safeguard protocol
+
+- Reuse the E9 validation logits and rerun E11 internally with strict disjoint
+  source (71--75), adaptation (76--80), and evaluation (81--89) subjects.
+- For each held-out reference identity, construct controlled source examples
+  from all other reference identities. Exclude both the outer held reference
+  and the current pseudo-target reference from every nested topology fit.
+- Fit one diagonal trust cap per class by least squares in the four-class
+  zero-sum bias space. Source labels define the oracle training target and
+  controlled source conditions; no adaptation/evaluation label fits a cap.
+- Apply each cap only as an upper bound on E11's pre-existing scalar trust.
+  Thus E12 can fall back toward topology but cannot amplify a pseudo-prior
+  update beyond E11.
+- Preserve random `n=32` and balanced `n=128` within the same RMSE, BAcc, and
+  recall-gap tolerances used by E11. Mean severe robustness also requires at
+  least 5% RMSE reduction, lower RMSE than topology-only, and a clustered
+  interval below zero.
+- Advance to repeated-seed confirmation only if every severe dominant-class
+  raw and clustered point direction improves and no two-sided interval detects
+  harm. A paper-level class-uniform claim requires every class-specific upper
+  interval bound below zero.
+
+The pre-push CPU screen passed the repeated-seed gate: severe RMSE changed from
+0.3489 to 0.2013 (42.3% reduction), versus 0.2239 for topology-only. All four
+dominant-class point directions improved. The right-fist clustered interval
+was approximately [-0.0266, 0.0206], so the stronger paper-level class-uniform
+claim remains false pending repeated seeds and an external dataset.

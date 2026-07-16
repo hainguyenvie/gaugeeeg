@@ -529,3 +529,51 @@ the working hypothesis or paper direction.
   class-conditional safeguard, with the right-fist failure as the explicit
   regression case. Do not tune a post-hoc global threshold merely to make E11
   pass.
+
+## 2026-07-16 — E11 reproduction review and strict-split correction
+
+- The user pushed a complete E11 output suite. Its headline result reproduced
+  the pre-push run, including the right-fist regression and failed strict gate.
+- Protocol review found a stronger limitation: the probability model used
+  subjects 71--75 and adaptation used 76--80, but topology used 71--80. Thus
+  subjects 76--80 influenced both topology and adaptation. The archived E11
+  result is exploratory and cannot support a strict cross-subject claim.
+- The E11 validator and defaults now require topology/prior subjects 71--75,
+  adaptation subjects 76--80, and evaluation subjects 81--89. Adaptation and
+  evaluation overlap is also rejected explicitly.
+- Under this strict split, E11's operator candidate improved all four severe
+  raw class directions versus fixed shrinkage, but its severe mean RMSE was
+  0.2797, worse than static topology RMSE 0.2239. Therefore pseudo-prior
+  correction was too aggressive even after E11's scalar shrinkage.
+
+## 2026-07-16 — E12 source-only class/operator safeguard
+
+- E12 learns one trust cap per output class and held-out reference identity in
+  full four-class zero-sum bias space. It uses source subjects 71--75 only.
+- The outer target reference is removed from all source examples. For every
+  source pseudo-target, both its reference and the outer target reference are
+  removed from the nested topology fit. No target-reference adaptation or
+  evaluation label fits a cap.
+- At deployment, the class caps are upper bounds on E11's scalar trust, so the
+  method can move an uncertain update back toward topology but cannot amplify
+  it. This directly addresses the observed over-correction rather than tuning
+  a global target threshold post hoc.
+- The frozen default CPU run completed end to end. Mean learned caps were
+  0.2110 (left fist), 0.2589 (right fist), 0.5768 (both fists), and 0.2323
+  (both feet); every controlled source condition improved over topology in all
+  outer folds.
+- At random `n=32`, RMSE changed from 0.2364 to 0.1983. At balanced `n=128`,
+  it changed from 0.3036 to 0.1927. Both preservation gates passed.
+- At severe 70% skew, RMSE changed from 0.3489 to 0.2013 (42.3% reduction) and
+  beat topology-only RMSE 0.2239. Mean BAcc changed from 0.46225 to 0.46119;
+  mean maximum recall gap improved from 0.1360 to 0.1049.
+- All four dominant-class raw and reference-clustered point directions
+  improved. Left fist, both fists, and both feet had intervals below zero.
+  Right fist improved by point estimate, but its clustered interval was
+  approximately [-0.0266, 0.0206]. No harm was detected, but its improvement
+  was not individually confirmed.
+- Decision: E12 passes the predeclared gate for repeated-seed confirmation but
+  not the paper-level class-uniform gate. The next user artifact must contain
+  the complete `outputs/reve_set_class_safeguard_audit_s7` directory, including
+  `strict_prior_baseline`. If independently reproduced, proceed to repeated
+  seeds and an external open EEG dataset rather than further seed-7 tuning.

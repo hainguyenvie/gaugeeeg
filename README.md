@@ -616,11 +616,11 @@ make set-prior-identifiability
 ```
 
 This stage is CPU-only and reuses the committed E9 validation logits. The
-class-probability model uses subjects 71--75 and CAR only; target adaptation
+class-probability and topology models use subjects 71--75; target adaptation
 batches use disjoint subjects 76--80; task effects are audited on subjects
 81--89. Its confusion matrix is estimated from leave-one-subject-out source
 predictions. A held-out electrode identity is still excluded across both
-montages.
+montages. The current command enforces all three subject groups as disjoint.
 
 Labels from target adaptation subjects only construct the random, balanced,
 and controlled-skew batches and audit true prior error. They do not fit the
@@ -645,3 +645,43 @@ outputs/reve_set_prior_identifiability_audit_s7
 
 The primary decision file is `prior_identifiability_summary.json`. Expected
 runtime for the reference CPU run was about 80 seconds, excluding tests.
+
+The archived first E11 result used subjects 76--80 in both topology fitting and
+adaptation. Its 8.95% mean result remains useful as an exploratory diagnostic,
+but not as strict cross-subject evidence. E12 reruns E11 internally with the
+corrected 71--75 / 76--80 / 81--89 split before evaluating the new safeguard.
+
+## Source-only class/operator trust safeguard
+
+E12 addresses two E11 failures without tuning on target labels: strict
+topology/adaptation separation and a harmful class-specific update. For each
+held-out electrode identity, it learns four diagonal trust caps in the
+zero-sum class-bias space using only subjects 71--75. The target electrode is
+excluded from both the source examples and each nested topology fit. At
+deployment, these caps can only reduce E11's existing pseudo-prior weight.
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+make set-class-safeguard
+```
+
+This stage is CPU-only and takes roughly 3--5 minutes on the reference machine.
+It writes both E12 results and the corrected strict E11 control beneath:
+
+```text
+outputs/reve_set_class_safeguard_audit_s7
+outputs/reve_set_class_safeguard_audit_s7/strict_prior_baseline
+```
+
+The pre-push run reduced severe-skew bias RMSE from 0.3489 to 0.2013 (42.3%),
+beating topology-only RMSE 0.2239. All four dominant-class point estimates
+improved and no class-specific harm was detected. The right-fist clustered
+interval still crossed zero, so `paper_level_class_uniform_claim_supported`
+remained false. This licenses repeated-seed and external-dataset confirmation,
+not a paper-level class-uniform claim.
+
+Push the complete output directory. The decision file is
+`class_safeguard_summary.json`; do not omit its `strict_prior_baseline`
+subdirectory.

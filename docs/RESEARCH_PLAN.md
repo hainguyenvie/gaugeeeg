@@ -133,10 +133,13 @@ explicitly falsifies the method under unknown or shifted class proportions.
 
 E10 confirmed both sides of that claim. Topology shrinkage substantially
 improved random batches of 32 trials, but severe-skew error was three times the
-balanced-batch error. E11 then tested regularized soft-confusion inversion with
-disjoint prior-model and adaptation subjects. It significantly reduced mean
-severe-skew bias RMSE, yet one of four dominant-class directions worsened
-slightly. It also could not recover the true severe batch prior accurately.
+balanced-batch error. Exploratory E11 then tested regularized soft-confusion
+inversion with disjoint prior-model and adaptation subjects. It significantly
+reduced mean severe-skew bias RMSE, yet one of four dominant-class directions
+worsened slightly. It also could not recover the true severe batch prior
+accurately. Post-run review found that topology fitting still overlapped the
+adaptation subjects, so E11's archived numbers are diagnostic rather than
+strict cross-subject evidence.
 
 The resulting empirical gap is narrower and more defensible: frozen logits can
 support a useful *partial* correction under unknown prior shift, but average
@@ -144,6 +147,15 @@ improvement does not provide class-uniform safety. The next proposed method
 must detect or constrain harmful class-specific updates without target labels,
 while retaining E10's small-batch benefit. E11 is evidence for this problem
 definition, not yet evidence that the proposed correction is publishable.
+
+E12 implements the resulting method hypothesis. A leave-one-reference-out
+source procedure learns class-wise upper bounds on E11's update in full
+zero-sum bias space. Source, adaptation, and evaluation subjects are now fully
+disjoint. The pre-push strict screen reduced severe RMSE by 42.3%, beat
+topology-only, and improved all four class directions by point estimate. The
+right-fist clustered interval still crossed zero, so E12 is a promising
+single-seed screen that must be repeated and transferred to an external
+dataset before supporting a class-uniform paper claim.
 
 ## 6. Core hypotheses
 
@@ -156,9 +168,9 @@ definition, not yet evidence that the proposed correction is publishable.
   without reducing clean-reference performance.
 - **H4:** Under unknown target class proportions, an operator-conditioned
   correction can improve severe-shift error for every dominant class while
-  preserving random and balanced conditions. E11 supports the mean effect but
-  falsifies the current class-uniform version, motivating an explicit safety
-  constraint.
+  preserving random and balanced conditions. E12 supports this by point
+  estimate under a strict split, but right-fist uncertainty still blocks a
+  class-uniform claim.
 
 ## 7. Go/no-go criteria
 
@@ -188,3 +200,6 @@ also produce no meaningful drift or downstream loss.
   changes are purely common-mode.
 - Results from the 12-subject pilot are for debugging and effect-size screening,
   not paper claims.
+- E12 is still one probe seed and one dataset. Its source-only caps are fixed
+  before target audit, but external transfer and repeated-seed uncertainty are
+  mandatory before a method claim.

@@ -48,7 +48,7 @@ class PriorIdentifiabilityTests(unittest.TestCase):
             aggregate = analyze_prior_identifiability(
                 predictions,
                 output,
-                topology_subjects=[71, 72, 73, 74],
+                topology_subjects=[71, 72],
                 prior_model_subjects=[71, 72],
                 adaptation_subjects=[73, 74],
                 evaluation_subjects=[81, 82],
@@ -62,7 +62,9 @@ class PriorIdentifiabilityTests(unittest.TestCase):
                 (output / "prior_identifiability_summary.json").read_text()
             )
             self.assertTrue(summary["prior_model_adaptation_subjects_disjoint"])
+            self.assertTrue(summary["topology_adaptation_subjects_disjoint"])
             self.assertTrue(summary["topology_evaluation_subjects_disjoint"])
+            self.assertTrue(summary["adaptation_evaluation_subjects_disjoint"])
             self.assertTrue(summary["source_and_target_batch_seeds_disjoint"])
             self.assertFalse(summary["physionet_test_subjects_used"])
             self.assertFalse(summary["target_reference_labels_used_for_candidate"])
@@ -120,7 +122,7 @@ class PriorIdentifiabilityTests(unittest.TestCase):
                 analyze_prior_identifiability(
                     path,
                     output,
-                    topology_subjects=[71, 72, 73, 74],
+                    topology_subjects=[71, 72],
                     prior_model_subjects=[71, 72],
                     adaptation_subjects=[73, 74],
                     evaluation_subjects=[81, 82],
@@ -164,6 +166,7 @@ class PriorIdentifiabilityTests(unittest.TestCase):
                 "validation.csv",
             ]
         )
+        self.assertEqual(args.topology_subjects, [71, 72, 73, 74, 75])
         self.assertEqual(args.prior_model_subjects, [71, 72, 73, 74, 75])
         self.assertEqual(args.adaptation_subjects, [76, 77, 78, 79, 80])
         self.assertEqual(args.batch_sizes[-1], 450)
