@@ -1,0 +1,5 @@
+comparison,dominant_class,class_name,candidate_cluster_mean_rmse,strongest_baseline,strongest_baseline_cluster_mean_rmse,candidate_minus_strongest_rmse,strongest_ci_lower,strongest_ci_upper,rmse_point_improves_vs_both_strong_baselines,rmse_intervals_confirm_vs_both_strong_baselines,task_noninferiority_vs_both_strong_baselines,material_harm_detected
+severe_left_fist,0,left_fist,0.15439284779111945,topology_ridge,0.17353812947484246,-0.01914528168372301,-0.03912403259282487,-0.0009511201698492981,True,False,False,False
+severe_right_fist,1,right_fist,0.1835193080809618,topology_ridge,0.17353812947484246,0.009981178606119334,-0.030115122057546743,0.05500546773945469,False,False,False,False
+severe_both_fists,2,both_fists,0.18334306856237462,topology_ridge,0.17353812947484246,0.00980493908753214,-0.018502906520972594,0.04303921717097394,False,False,False,False
+severe_both_feet,3,both_feet,0.1733100480596122,topology_ridge,0.17353812947484246,-0.00022808141523028845,-0.02640461013559653,0.030079950895166557,True,False,False,False

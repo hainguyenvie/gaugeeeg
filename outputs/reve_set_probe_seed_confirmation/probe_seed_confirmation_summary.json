@@ -1,0 +1,114 @@
+{
+  "stage": "E14 untouched-probe-seed mean-method confirmation",
+  "gate_frozen_before_new_probe_results": true,
+  "frozen_e13_summary": "outputs/reve_set_strong_baseline_audit_s7/strong_baseline_summary.json",
+  "exploratory_probe_seed_excluded_from_confirmation": 7,
+  "new_probe_seeds": [
+    21,
+    42
+  ],
+  "n_new_probe_seeds": 2,
+  "reference_seed": 7,
+  "candidate": "class_operator_trust_safeguard",
+  "strong_baselines": [
+    "operator_confusion_shrinkage",
+    "topology_ridge"
+  ],
+  "bootstrap_unit": "hierarchical crossed probe seed x batch repeat x held-reference identity",
+  "bootstrap_resamples": 10000,
+  "bootstrap_confidence": 0.95,
+  "bootstrap_seed": 20260720,
+  "max_bacc_loss": 0.01,
+  "max_gap_increase": 0.01,
+  "probe_train_validation_audit_test_pairwise_disjoint": true,
+  "physionet_test_subjects_used": false,
+  "every_new_seed_mean_rmse_point_improves_vs_both_strong_baselines": false,
+  "hierarchical_mean_rmse_intervals_confirm_vs_both_strong_baselines": false,
+  "hierarchical_mean_task_noninferiority": false,
+  "mean_material_harm_detected": false,
+  "mean_method_new_seed_confirmation_supported": false,
+  "new_seed_class_uniform_diagnostic_supported": false,
+  "current_class_uniform_claim_remains_rejected": true,
+  "paper_level_mean_claim_supported": false,
+  "paper_claim_blockers": [
+    "single_dataset",
+    "only_two_untouched_probe_seeds",
+    "E13_seed7_gate_was_post_hoc"
+  ],
+  "per_seed_mean_gate": [
+    {
+      "probe_seed": 21,
+      "all_mean_rmse_points_improve": false,
+      "any_mean_material_harm": false
+    },
+    {
+      "probe_seed": 42,
+      "all_mean_rmse_points_improve": true,
+      "any_mean_material_harm": false
+    }
+  ],
+  "class_diagnostic": [
+    {
+      "comparison": "severe_left_fist",
+      "dominant_class": 0,
+      "class_name": "left_fist",
+      "candidate_cluster_mean_rmse": 0.15439284779111945,
+      "strongest_baseline": "topology_ridge",
+      "strongest_baseline_cluster_mean_rmse": 0.17353812947484246,
+      "candidate_minus_strongest_rmse": -0.01914528168372301,
+      "strongest_ci_lower": -0.03912403259282487,
+      "strongest_ci_upper": -0.0009511201698492981,
+      "rmse_point_improves_vs_both_strong_baselines": true,
+      "rmse_intervals_confirm_vs_both_strong_baselines": false,
+      "task_noninferiority_vs_both_strong_baselines": false,
+      "material_harm_detected": false
+    },
+    {
+      "comparison": "severe_right_fist",
+      "dominant_class": 1,
+      "class_name": "right_fist",
+      "candidate_cluster_mean_rmse": 0.1835193080809618,
+      "strongest_baseline": "topology_ridge",
+      "strongest_baseline_cluster_mean_rmse": 0.17353812947484246,
+      "candidate_minus_strongest_rmse": 0.009981178606119334,
+      "strongest_ci_lower": -0.030115122057546743,
+      "strongest_ci_upper": 0.05500546773945469,
+      "rmse_point_improves_vs_both_strong_baselines": false,
+      "rmse_intervals_confirm_vs_both_strong_baselines": false,
+      "task_noninferiority_vs_both_strong_baselines": false,
+      "material_harm_detected": false
+    },
+    {
+      "comparison": "severe_both_fists",
+      "dominant_class": 2,
+      "class_name": "both_fists",
+      "candidate_cluster_mean_rmse": 0.18334306856237462,
+      "strongest_baseline": "topology_ridge",
+      "strongest_baseline_cluster_mean_rmse": 0.17353812947484246,
+      "candidate_minus_strongest_rmse": 0.00980493908753214,
+      "strongest_ci_lower": -0.018502906520972594,
+      "strongest_ci_upper": 0.04303921717097394,
+      "rmse_point_improves_vs_both_strong_baselines": false,
+      "rmse_intervals_confirm_vs_both_strong_baselines": false,
+      "task_noninferiority_vs_both_strong_baselines": false,
+      "material_harm_detected": false
+    },
+    {
+      "comparison": "severe_both_feet",
+      "dominant_class": 3,
+      "class_name": "both_feet",
+      "candidate_cluster_mean_rmse": 0.1733100480596122,
+      "strongest_baseline": "topology_ridge",
+      "strongest_baseline_cluster_mean_rmse": 0.17353812947484246,
+      "candidate_minus_strongest_rmse": -0.00022808141523028845,
+      "strongest_ci_lower": -0.02640461013559653,
+      "strongest_ci_upper": 0.030079950895166557,
+      "rmse_point_improves_vs_both_strong_baselines": true,
+      "rmse_intervals_confirm_vs_both_strong_baselines": false,
+      "task_noninferiority_vs_both_strong_baselines": false,
+      "material_harm_detected": false
+    }
+  ],
+  "decision_rule": "Using only untouched probe seeds, require lower mean RMSE point estimates against strict E11 and topology in every seed and all three frozen regimes; require crossed hierarchical RMSE intervals below zero, BAcc/recall-gap noninferiority, and no material mean harm. Seed 7 is excluded from confirmation. Class-wise results remain a falsification diagnostic and cannot revive the current class-uniform claim.",
+  "next_method_recommendation": "do_not_tune_on_audit_subjects_revisit_source_only_method"
+}
