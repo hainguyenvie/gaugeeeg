@@ -442,3 +442,50 @@ The five E14 output directories include two validation-only logit runs, two
 complete E12 runs with nested strict-E11 controls, and one aggregate decision.
 The aggregate writes a run manifest, per-seed comparisons, hierarchical
 comparisons, a class diagnostic, and `probe_seed_confirmation_summary.json`.
+
+The reproduced E14 result was negative. Seed 21 failed the all-regime point
+gate, while seed 42 passed it. Across the two seeds, candidate-minus-topology
+RMSE was approximately -0.0064 for random batches, +0.0001 for balanced
+batches, and +0.0001 for severe skew; all three 95% hierarchical intervals
+crossed zero. Task noninferiority also failed. The current E12 cap method is
+therefore closed rather than tuned further on audit subjects.
+
+## E15 training-time observation-operator consistency protocol
+
+- Reuse the leakage-free four-way split: probe train 1--60, probe validation
+  61--70, development audit 71--89, and reserved test 90--109. E15 must not
+  extract or score the reserved test split.
+- Keep the frozen REVE encoder and q4 variable-cardinality set probe. Train on
+  the nested observation views CAR, native32@CAR, and native16@CAR; each view
+  may contain a different number of REVE tokens.
+- Compare three arms at the same probe/reference seed 7: CAR-only CE,
+  supervised multi-view CE, and operator consistency. The rule-informed arm
+  uses full CAR as a stop-gradient teacher and minimizes
+  `CE(all views) + KL(CAR || native32) * 0.5 + KL(CAR || native16) * 1.0`.
+  The scalar consistency multiplier is fixed at 1.0 before audit results.
+- Evaluate CAR, native32/native16 under CAR, Cz, and Pz on subjects 71--89.
+  Use paired subject bootstrap intervals; never resample trials independently.
+- Preserve clean CAR versus CAR-only within 0.01 by point and interval. Improve
+  native16@CAR BAcc by at least 0.02 versus CAR-only with an interval above
+  zero. Also beat multi-view CE on native16@CAR BAcc with an interval above
+  zero, preserve its worst-class recall within 0.01, and do not lose
+  native32@CAR BAcc by point estimate.
+- The multi-view control is the critical novelty check. If it matches or beats
+  operator consistency, the evidence supports augmentation but not the proposed
+  rule loss. Do not report the rule as a contribution in that case.
+- E15 is post-hoc development and falsification only. A pass freezes code and
+  hyperparameters for one E16 multi-seed evaluation on subjects 90--109. A
+  failure stops this readout or retains only the simpler multi-view baseline;
+  audit labels cannot select another consistency weight.
+
+Run:
+
+```bash
+make test
+make set-operator-consistency
+```
+
+The runner writes three arm directories and
+`outputs/reve_set_operator_consistency_screen_s7`. The latter contains the
+view-level metrics, paired comparisons, run manifest, and the frozen decision
+summary.

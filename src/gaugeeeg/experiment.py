@@ -282,15 +282,21 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
 
         if train_y is None or val_y is None:
             raise RuntimeError("No training features were extracted")
+        probe_name = str(experiment.get("probe", "sklearn_logreg")).casefold()
         if len(training_views) == 1:
             train_x = train_features[0]
             val_x = val_features[0]
+        elif probe_name == "reve_set":
+            # Native montages have different token counts. The variable-set
+            # probe consumes an aligned tuple rather than an impossible dense
+            # stack, while every view still shares trial and label order.
+            train_x = tuple(train_features)
+            val_x = tuple(val_features)
         else:
             train_x = np.stack(train_features, axis=1)
             val_x = np.stack(val_features, axis=1)
         _validate_labels("train", train_y, expected_classes)
         _validate_labels("validation", val_y, expected_classes)
-        probe_name = str(experiment.get("probe", "sklearn_logreg")).casefold()
         selected_c = float("nan")
         selected_epoch = 0
         validation_consistency_loss = float("nan")
@@ -344,8 +350,6 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                     **common_probe_kwargs,
                 )
             else:
-                if probe_objective != "car_only" or len(training_views) != 1:
-                    raise ValueError("probe: reve_set currently requires CAR-only single-view training")
                 probe = fit_reve_set_probe(
                     train_x,
                     train_y,
@@ -354,6 +358,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                     n_queries=int(experiment.get("set_queries", 8)),
                     n_heads=int(experiment.get("set_heads", 8)),
                     ff_multiplier=int(experiment.get("set_ff_multiplier", 2)),
+                    objective=probe_objective,
+                    consistency_weight=consistency_weight,
+                    consistency_view_weights=experiment.get(
+                        "consistency_view_weights"
+                    ),
                     **common_probe_kwargs,
                 )
             predictor = probe.model
@@ -383,6 +392,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                             "probe_objective": probe_objective,
                             "training_views": training_views,
                             "consistency_weight": consistency_weight,
+                            "consistency_view_weights": experiment.get(
+                                "consistency_view_weights"
+                            ),
                             "set_queries": int(experiment.get("set_queries", 0)),
                             "set_heads": int(experiment.get("set_heads", 0)),
                         },
@@ -647,6 +659,10 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             "set_queries": int(experiment.get("set_queries", 0)),
             "set_heads": int(experiment.get("set_heads", 0)),
             "training_views": training_views,
+            "consistency_weight": consistency_weight,
+            "consistency_view_weights": experiment.get(
+                "consistency_view_weights"
+            ),
             "validation_prediction_views": validation_prediction_views,
             "validation_predictions_only": True,
             "prediction_split": prediction_split,

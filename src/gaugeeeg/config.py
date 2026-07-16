@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -73,14 +74,45 @@ def validate_config(config: dict[str, Any]) -> None:
     if not training_views or training_views[0] != "car":
         raise ValueError("training_views must start with 'car'")
     objective = str(experiment.get("probe_objective", "car_only")).casefold()
-    if objective not in {"car_only", "multi_view_ce", "rule_consistency"}:
+    if objective not in {
+        "car_only",
+        "multi_view_ce",
+        "rule_consistency",
+        "operator_consistency",
+    }:
         raise ValueError("Unknown probe_objective")
-    if probe == "reve_set" and (objective != "car_only" or len(training_views) != 1):
-        raise ValueError("probe: reve_set currently requires CAR-only single-view training")
+    if objective == "operator_consistency" and probe != "reve_set":
+        raise ValueError("operator_consistency requires probe: reve_set")
     if objective != "car_only" and len(training_views) < 2:
         raise ValueError(f"{objective} requires at least two training_views")
-    if float(experiment.get("consistency_weight", 0.0)) < 0.0:
+    consistency_weight = float(experiment.get("consistency_weight", 0.0))
+    if not math.isfinite(consistency_weight) or consistency_weight < 0.0:
         raise ValueError("consistency_weight must be non-negative")
+    if objective == "operator_consistency":
+        weights = [
+            float(value)
+            for value in experiment.get(
+                "consistency_view_weights",
+                [0.0, *([1.0] * (len(training_views) - 1))],
+            )
+        ]
+        if len(weights) != len(training_views):
+            raise ValueError(
+                "operator_consistency requires one consistency_view_weight per training view"
+            )
+        if (
+            weights[0] != 0.0
+            or any(not math.isfinite(value) or value < 0.0 for value in weights)
+        ):
+            raise ValueError(
+                "operator_consistency weights must be non-negative with zero CAR-teacher weight"
+            )
+        if not any(value > 0.0 for value in weights[1:]):
+            raise ValueError(
+                "operator_consistency requires at least one positive student-view weight"
+            )
+        if consistency_weight <= 0.0:
+            raise ValueError("operator_consistency requires a positive consistency_weight")
     if experiment.get("validation_predictions_only", False):
         if not experiment.get("save_validation_predictions", False):
             raise ValueError(

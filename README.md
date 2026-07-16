@@ -770,3 +770,52 @@ noninferiority, and no material mean harm. Class-wise results remain a
 falsification diagnostic and cannot revive the current class-uniform claim.
 Even a pass advances the frozen mean method only to an external open EEG
 dataset; two untouched seeds on one dataset are not a paper-level claim.
+
+## Training-time operator-consistency screen
+
+E14 failed its untouched-seed gate: seed 21 did not beat both strong baselines
+in every frozen regime, and the hierarchical candidate-versus-topology RMSE
+intervals crossed zero. This closes the current post-hoc class-cap method. E15
+does not tune another cap on subjects 71--89. It instead asks a new source-only
+representation/readout question: can the q4 REVE set probe learn the nested
+64/32/16-channel observation operators during training?
+
+E15 trains three strict controls with probe seed 7:
+
+- CAR-only supervised CE;
+- CAR/native32/native16 supervised multi-view CE; and
+- the same multi-view CE plus CAR-teacher operator consistency. The full-CAR
+  prediction is detached and supplies KL targets to native32 and native16 with
+  frozen weights 0.5 and 1.0.
+
+This third arm must beat the second arm, so ordinary montage augmentation
+cannot be relabeled as a rule-informed contribution. All arms train on subjects
+1--60, early-stop on 61--70, and are screened on development subjects 71--89.
+Reserved test subjects 90--109 remain unencoded and unscored.
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+make set-operator-consistency
+```
+
+Use `DEVICE=cuda:1 make set-operator-consistency` for another GPU. Existing
+REVE features are reused when their cache keys match; native32/native16 training
+features may need to be encoded once. Push these four complete directories:
+
+```text
+outputs/reve_set_operator_screen_car_only_s7
+outputs/reve_set_operator_screen_multi_view_ce_s7
+outputs/reve_set_operator_screen_consistency_s7
+outputs/reve_set_operator_consistency_screen_s7
+```
+
+The decision file is `operator_consistency_summary.json`. Passing requires
+clean-CAR noninferiority, at least +0.02 native16 balanced accuracy versus
+CAR-only with a paired subject-bootstrap interval above zero, a positive
+interval versus multi-view CE, preserved native16 worst-class recall, and no
+native32 point loss. E15 is development-only. A pass freezes the method for a
+single multi-seed evaluation on the still-reserved test subjects; a failure
+keeps multi-view CE only if augmentation itself helps and otherwise stops this
+readout design.

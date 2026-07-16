@@ -1,4 +1,4 @@
-.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control set-bias-manifold set-prior-stress set-prior-identifiability set-class-safeguard set-strong-baseline-audit set-probe-seed-confirmation
+.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control set-bias-manifold set-prior-stress set-prior-identifiability set-class-safeguard set-strong-baseline-audit set-probe-seed-confirmation set-operator-consistency
 
 install:
 	python -m pip install -e ".[data,dev]"
@@ -53,3 +53,6 @@ set-strong-baseline-audit:
 
 set-probe-seed-confirmation:
 	bash scripts/run_reve_set_probe_seed_confirmation.sh
+
+set-operator-consistency:
+	bash scripts/run_reve_set_operator_consistency.sh

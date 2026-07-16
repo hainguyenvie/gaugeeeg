@@ -50,6 +50,43 @@ class ReveSetProbeTests(unittest.TestCase):
                 device="cpu",
             )
 
+    def test_operator_consistency_accepts_variable_token_views(self):
+        from gaugeeeg.set_probe import fit_reve_set_probe
+
+        rng = np.random.default_rng(11)
+        labels = np.tile(np.arange(4), 16)
+        full = rng.normal(scale=0.1, size=(64, 8, 8)).astype(np.float32)
+        native32 = full[:, :5].copy()
+        native16 = full[:, :3].copy()
+        for trial, label in enumerate(labels):
+            full[trial, 0, label] += 3.0
+            native32[trial, 0, label] += 3.0
+            native16[trial, 0, label] += 3.0
+
+        result = fit_reve_set_probe(
+            (full[:48], native32[:48], native16[:48]),
+            labels[:48],
+            (full[48:], native32[48:], native16[48:]),
+            labels[48:],
+            initial_query=np.zeros(8, dtype=np.float32),
+            n_classes=4,
+            seed=11,
+            device="cpu",
+            n_queries=2,
+            n_heads=2,
+            ff_multiplier=1,
+            batch_size=8,
+            epochs=4,
+            learning_rate=0.02,
+            warmup_epochs=0,
+            patience=4,
+            objective="operator_consistency",
+            consistency_weight=1.0,
+            consistency_view_weights=[0.0, 0.5, 1.0],
+        )
+        self.assertGreaterEqual(result.validation_balanced_accuracy, 0.5)
+        self.assertGreaterEqual(result.validation_consistency_loss, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

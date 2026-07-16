@@ -411,6 +411,36 @@ def _probe_seed_confirmation_command(args: argparse.Namespace) -> None:
     print(selected.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _operator_consistency_command(args: argparse.Namespace) -> None:
+    from .operator_consistency import analyze_operator_consistency
+
+    result = analyze_operator_consistency(
+        args.e14_summary,
+        args.car_only_run,
+        args.multi_view_run,
+        args.operator_run,
+        args.output_dir,
+        bootstrap_resamples=args.bootstrap_resamples,
+        bootstrap_confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+        minimum_native16_bacc_gain=args.minimum_native16_bacc_gain,
+        maximum_clean_bacc_loss=args.maximum_clean_bacc_loss,
+        maximum_worst_recall_loss=args.maximum_worst_recall_loss,
+    )
+    selected = result.loc[
+        result["test_view"].isin(["car", "native32@car", "native16@car"])
+        & result["metric"].eq("balanced_accuracy"),
+        [
+            "test_view",
+            "baseline",
+            "candidate_minus_baseline",
+            "ci_lower",
+            "ci_upper",
+        ],
+    ]
+    print(selected.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -425,7 +455,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--reference-seed", type=int, help="Fixed seed for stochastic reference views")
     run.add_argument(
         "--probe-objective",
-        choices=["car_only", "multi_view_ce", "rule_consistency"],
+        choices=[
+            "car_only",
+            "multi_view_ce",
+            "rule_consistency",
+            "operator_consistency",
+        ],
     )
     run.add_argument("--consistency-weight", type=float)
     run.add_argument("--training-views", nargs="+", help="Override aligned train/validation views")
@@ -850,6 +885,44 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-gap-increase", type=float, default=0.01
     )
     probe_confirmation.set_defaults(handler=_probe_seed_confirmation_command)
+
+    operator_consistency = subparsers.add_parser(
+        "operator-consistency-audit",
+        help="Audit q4 CAR-teacher consistency on development subjects",
+    )
+    operator_consistency.add_argument(
+        "--e14-summary",
+        default=(
+            "outputs/reve_set_probe_seed_confirmation/"
+            "probe_seed_confirmation_summary.json"
+        ),
+    )
+    operator_consistency.add_argument("--car-only-run", required=True)
+    operator_consistency.add_argument("--multi-view-run", required=True)
+    operator_consistency.add_argument("--operator-run", required=True)
+    operator_consistency.add_argument(
+        "--output-dir",
+        default="outputs/reve_set_operator_consistency_screen_s7",
+    )
+    operator_consistency.add_argument(
+        "--bootstrap-resamples", type=int, default=5000
+    )
+    operator_consistency.add_argument(
+        "--bootstrap-confidence", type=float, default=0.95
+    )
+    operator_consistency.add_argument(
+        "--bootstrap-seed", type=int, default=20260721
+    )
+    operator_consistency.add_argument(
+        "--minimum-native16-bacc-gain", type=float, default=0.02
+    )
+    operator_consistency.add_argument(
+        "--maximum-clean-bacc-loss", type=float, default=0.01
+    )
+    operator_consistency.add_argument(
+        "--maximum-worst-recall-loss", type=float, default=0.01
+    )
+    operator_consistency.set_defaults(handler=_operator_consistency_command)
     return parser
 
 

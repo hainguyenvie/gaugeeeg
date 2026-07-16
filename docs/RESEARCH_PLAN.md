@@ -177,6 +177,22 @@ validation 61--70, downstream audit 71--89, and reserved test 90--109. Its
 confirmatory analysis uses only unseen probe seeds 21 and 42 under the frozen
 E13 mean-only rule.
 
+E14 then rejected that mean-method hypothesis. Seed 21 did not improve against
+both strong baselines in every regime, the crossed-seed RMSE intervals against
+topology all included zero, and hierarchical task noninferiority failed. This
+is a useful terminal limitation: a post-hoc logit correction can look strong
+for one fitted probe yet fail to transfer across probe optimization seeds.
+Further cap selection on the same audit pool would be post-hoc overfitting.
+
+E15 pivots the core idea upstream. The candidate teaches a
+variable-cardinality REVE set readout that native32/native16 are nested
+observation operators of the full-CAR trial. A detached full-CAR prediction is
+the source-only teacher for KL consistency, while every view retains its task
+label. The decisive baseline is identical supervised multi-view training
+without KL. This isolates whether operator structure contributes beyond data
+augmentation. Development subjects 71--89 can reject this hypothesis, but only
+the untouched 90--109 pool can evaluate a frozen positive method.
+
 ## 6. Core hypotheses
 
 - **H1:** Frozen REVE embeddings and linear-probe performance change under
@@ -188,9 +204,12 @@ E13 mean-only rule.
   without reducing clean-reference performance.
 - **H4:** Under unknown target class proportions, an operator-conditioned
   correction can improve mean severe-shift error while preserving random and
-  balanced conditions. E13 makes this the current testable claim; improvement
-  for every dominant class is a separate, currently falsified hypothesis
-  because E12 harms right-fist performance relative to strict E11.
+  balanced conditions. E14 rejected this hypothesis for the current E12
+  correction across untouched probe seeds.
+- **H5:** Training-time CAR-teacher consistency improves native16 task accuracy
+  beyond supervised multi-view augmentation while preserving clean CAR,
+  native32, and worst-class recall. E15 is the development-only test of this
+  replacement hypothesis.
 
 ## 7. Go/no-go criteria
 
@@ -230,3 +249,11 @@ also produce no meaningful drift or downstream loss.
   pool. It is retained for hypothesis formation and paired failure analysis,
   but excluded from E14 confirmation. E14's four-way split prevents this
   leakage for new seeds.
+- E15 follows inspection of E14 and uses audit subjects 71--89, so it cannot
+  confirm a paper claim. Its only valid role is method selection/falsification;
+  a positive result requires a frozen evaluation on reserved subjects 90--109
+  and then external-dataset replication.
+- The full-CAR teacher may simply transfer its own errors, and correlated
+  nested views reduce effective diversity. The multi-view CE arm distinguishes
+  operator-consistency value from ordinary augmentation but cannot eliminate
+  this acquisition-family limitation.

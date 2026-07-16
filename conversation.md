@@ -648,3 +648,28 @@ the working hypothesis or paper direction.
   user's existing seed-21 audit and both trained probe-logit runs remain
   reusable; only the missing seed-42 E12 audit and final E14 aggregation need
   to run after pulling the fix.
+
+## 2026-07-16 — E14 negative confirmation and E15 method pivot
+
+- The user pushed the completed seed-42 audit and final E14 aggregation. Both
+  untouched probes used the strict 1--60 / 61--70 / 71--89 / 90--109 split,
+  and the reserved test subjects remained unused.
+- Seed 21 failed the frozen all-regime point gate; seed 42 passed it. In the
+  crossed-seed analysis, candidate-minus-topology RMSE was about -0.0064 for
+  random batches, +0.0001 for balanced batches, and +0.0001 for severe skew,
+  with every 95% interval crossing zero. Hierarchical task noninferiority also
+  failed. E14 therefore rejects the current mean class-cap method.
+- No new cap or threshold will be chosen using audit subjects. The next test
+  moves the rule upstream into training a variable-cardinality q4 REVE set
+  readout.
+- E15 compares CAR-only CE, multi-view CE, and multi-view CE plus a detached
+  full-CAR teacher. Native32 and native16 students receive fixed KL weights 0.5
+  and 1.0. The direct multi-view CE baseline determines whether the rule loss
+  adds value beyond ordinary montage augmentation.
+- E15 remains development-only on subjects 71--89 and keeps 90--109 locked.
+  Its gate requires clean preservation, at least +0.02 native16 BAcc versus
+  CAR-only with a positive paired interval, a positive interval versus
+  multi-view CE, preserved worst-class recall, and no native32 point loss.
+- A pass freezes the complete method for one multi-seed reserved-test run. If
+  only multi-view CE helps, retain the simpler baseline and reject the claimed
+  rule novelty; if neither helps, stop this readout design.
