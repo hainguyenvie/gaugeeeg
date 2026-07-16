@@ -1,4 +1,4 @@
-.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control set-bias-manifold set-prior-stress
+.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control set-bias-manifold set-prior-stress set-prior-identifiability
 
 install:
 	python -m pip install -e ".[data,dev]"
@@ -41,3 +41,6 @@ set-bias-manifold:
 
 set-prior-stress:
 	bash scripts/run_reve_set_prior_stress.sh
+
+set-prior-identifiability:
+	bash scripts/run_reve_set_prior_identifiability.sh

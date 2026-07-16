@@ -485,3 +485,47 @@ the working hypothesis or paper direction.
   [-0.154, -0.069] at random n=32. Severe-skew RMSE was 3.0 times balanced
   RMSE at n=128. These temporary outputs are not committed; the user run is
   the independent reproduction artifact.
+
+## 2026-07-16 — E10 reproduction review and E11 decision
+
+- The user's committed E10 output reproduced the pre-push result: at random
+  `n=32`, topology shrinkage reduced bias RMSE from 0.2967 to 0.1839 (38.0%),
+  reduced mean maximum recall gap from 0.1168 to 0.0941 (19.5%), and increased
+  mean BAcc by 0.0022. The paired RMSE-delta interval was [-0.154, -0.069].
+- Severe 70%-skew RMSE at `n=128` was 0.3481 versus 0.1161 for balanced
+  batches, a ratio of 3.00. This confirms that E10's batch-size-only weight
+  cannot distinguish observation-operator bias from target label shift.
+- E11 separates prior-model subjects 71--75 from adaptation subjects 76--80,
+  estimates a soft confusion matrix using leave-one-subject-out CAR
+  predictions, and performs regularized pseudo-prior inversion anchored to the
+  nominal prior. Subjects 81--89 remain evaluation-only; PhysioNet test
+  subjects remain unused.
+- The deployable candidate uses frozen target logits, source soft confusion,
+  and leave-one-electrode-out topology only. Adaptation labels construct and
+  audit controlled stress batches but cannot fit any candidate quantity. A
+  perturbation test enforces this invariance.
+- The gate is intentionally two-level. Mean severe robustness requires a 5%
+  RMSE reduction with a paired interval below zero and preserved task metrics.
+  The strict method claim additionally requires every dominant-class direction
+  to improve.
+
+## 2026-07-16 — E11 pre-push CPU verification
+
+- The frozen default run completed in about 80 seconds. At severe 70% skew and
+  `n=128`, operator-confusion shrinkage reduced mean RMSE from 0.1856 to 0.1690
+  (8.95%); the paired 95% delta interval was [-0.0219, -0.0113]. It also
+  reduced mean maximum recall gap from 0.0990 to 0.0937, with mean BAcc changing
+  by -0.0007.
+- Random `n=32` RMSE changed from 0.1771 to 0.1753, and balanced `n=128` RMSE
+  changed from 0.1439 to 0.1391, so both nominal-preservation checks passed.
+- Three dominant-class directions improved. Right-fist-dominant RMSE worsened
+  slightly from 0.1452 to 0.1482 (+0.0031, about 2.1%). Accordingly, mean
+  severe robustness is supported, class-uniform robustness is false, and the
+  strict method gate remains false.
+- The regularized pseudo-prior's severe-shift RMSE to the true batch prior was
+  0.254, so E11 must not claim accurate label-prior recovery. The defensible
+  interpretation is partial correction from frozen logits.
+- Decision: preserve the failed strict gate and make the next step a
+  class-conditional safeguard, with the right-fist failure as the explicit
+  regression case. Do not tune a post-hoc global threshold merely to make E11
+  pass.

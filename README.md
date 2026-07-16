@@ -599,3 +599,49 @@ outputs/reve_set_prior_stress_audit_s7
 The decision file is `prior_stress_summary.json`. It distinguishes a genuine
 small-batch benefit from the full-batch prior-matching identity and explicitly
 reports failure under class-prior confounding.
+
+## Cross-subject prior-identifiability audit
+
+E11 addresses the limitation confirmed by E10: fixed topology shrinkage helps
+at small batch sizes, but a target batch's class mix remains confounded with
+reference-induced class bias. It tests whether a source-trained soft confusion
+operator can extract a conservative pseudo-prior from frozen target logits and
+use it to correct severe prior shift.
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+make set-prior-identifiability
+```
+
+This stage is CPU-only and reuses the committed E9 validation logits. The
+class-probability model uses subjects 71--75 and CAR only; target adaptation
+batches use disjoint subjects 76--80; task effects are audited on subjects
+81--89. Its confusion matrix is estimated from leave-one-subject-out source
+predictions. A held-out electrode identity is still excluded across both
+montages.
+
+Labels from target adaptation subjects only construct the random, balanced,
+and controlled-skew batches and audit true prior error. They do not fit the
+pseudo-prior, candidate bias, or mixing weight. E11 separately reports:
+
+- mean severe-skew robustness;
+- class-uniform severe-skew robustness across all four dominant classes; and
+- the strict method gate, which requires both plus nominal preservation.
+
+The pre-push reference run reduced mean severe-skew bias RMSE by 8.95% with a
+paired 95% interval below zero, while preserving the nominal conditions. It
+improved three of four dominant-class directions; right-fist-dominant RMSE
+increased by 0.0031. The strict gate therefore remains false. This is an
+intentional falsification result and motivates a class-conditional safeguard,
+not a post-hoc relaxation of the gate.
+
+Push the complete output directory after running:
+
+```text
+outputs/reve_set_prior_identifiability_audit_s7
+```
+
+The primary decision file is `prior_identifiability_summary.json`. Expected
+runtime for the reference CPU run was about 80 seconds, excluding tests.

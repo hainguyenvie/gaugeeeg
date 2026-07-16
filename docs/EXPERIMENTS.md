@@ -23,6 +23,7 @@ sanity check fails.
 | E8 | Validation-only calibration control | `make set-calibration-control` | Readout-vs-representation decision |
 | E9 | Reference-bias manifold audit | `make set-bias-manifold` | Unseen-electrode bias predictability |
 | E10 | Known-prior/small-batch stress | `make set-prior-stress` | Prior confounding and topology-shrinkage decision |
+| E11 | Cross-subject prior identifiability | `make set-prior-identifiability` | Mean-vs-class-uniform robustness decision |
 
 ## E0 acceptance
 
@@ -305,3 +306,42 @@ is therefore not the baseline to carry forward.
   loses 0.03 BAcc, or increases mean maximum recall gap by 0.05 relative to
   balanced batches. This limitation remains mandatory even if shrinkage
   passes.
+
+E10 passed its small-batch gate on the user-reproduced run. At random `n=32`,
+topology shrinkage reduced mean bias RMSE by 38.0%, reduced the mean maximum
+recall gap by 19.5%, and changed mean BAcc by +0.0022. Its paired RMSE-delta
+95% interval was [-0.154, -0.069]. Severe-skew RMSE at `n=128` was 3.00 times
+balanced RMSE, confirming the prior-confounding limitation.
+
+## E11 cross-subject prior-identifiability protocol
+
+- Reuse E9 validation logits only. Do not extract features or touch PhysioNet
+  test subjects. Keep evaluation subjects 81--89 unchanged.
+- Train the soft class-probability model on CAR trials from subjects 71--75.
+  Estimate its soft confusion matrix from leave-one-subject-out probabilities.
+  Construct adaptation batches only from disjoint subjects 76--80, with source
+  and adaptation resampling seeds fixed separately.
+- Recover a simplex pseudo-prior by ridge-regularized inversion of the soft
+  confusion matrix, anchored to the nominal uniform prior. Compare the fixed
+  regularization `1.0` with weak `0.1` and soft-mean ablations; do not select a
+  value on held-out target performance.
+- Convert the pseudo-prior to an additive target bias, then shrink it toward
+  leave-one-electrode-out topology using source-reference errors. Exclude the
+  target electrode identity across native16 and native32 throughout fitting.
+- Target-adaptation labels may construct random, balanced, 40%, and 70%
+  controlled-skew batches and score the audit only. A leakage test perturbs
+  held-out target-reference labels and requires all deployable estimates to
+  remain exactly unchanged.
+- Preserve random `n=32` and balanced `n=128` within 5% bias RMSE, 0.01 BAcc,
+  and 0.01 mean maximum-recall-gap tolerances relative to fixed E10 shrinkage.
+- Mean severe robustness requires at least 5% RMSE reduction at 70% skew,
+  lower RMSE than topology, preserved task metrics, and a paired 95% RMSE-delta
+  interval below zero. The strict method gate additionally requires improvement
+  for every dominant-class direction. Do not replace this with an average-only
+  claim after observing results.
+
+The local reference run supports mean severe robustness (8.95% RMSE reduction;
+paired interval [-0.0219, -0.0113]) but not class-uniform robustness. Three of
+four dominant-class directions improved; right-fist-dominant RMSE changed from
+0.1452 to 0.1482. Therefore E11 is a diagnostic result, and the next method
+must add a class-conditional safeguard before a paper-level method claim.

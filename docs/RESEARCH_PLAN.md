@@ -70,9 +70,10 @@ no prior study has addressed this problem.
    task performance and representation-drift metrics.
 2. **Exact sanity baseline.** CAR canonicalization proves the benchmark is
    measuring the intended additive gauge component.
-3. **Operator-regularized known-prior readout.** Use the known task prior for
-   label-free bias correction and shrink uncertain small-batch estimates toward
-   a correction predicted from the observation operator.
+3. **Prior-confounding benchmark and class-safe operator correction.** Expose
+   the identifiability boundary between reference bias and unknown label shift,
+   then regularize uncertain target corrections with the observation operator
+   and an explicit worst-class safeguard.
 4. **Beyond ideal common-mode shifts.** Extend to bipolar derivations,
    missing-channel montages, and cross-dataset transfer, where exact CAR
    canonicalization alone is insufficient.
@@ -130,6 +131,20 @@ small-batch and prior-robust adaptation. E10 therefore tests whether topology
 provides a useful inductive bias when unlabeled batches are scarce, and
 explicitly falsifies the method under unknown or shifted class proportions.
 
+E10 confirmed both sides of that claim. Topology shrinkage substantially
+improved random batches of 32 trials, but severe-skew error was three times the
+balanced-batch error. E11 then tested regularized soft-confusion inversion with
+disjoint prior-model and adaptation subjects. It significantly reduced mean
+severe-skew bias RMSE, yet one of four dominant-class directions worsened
+slightly. It also could not recover the true severe batch prior accurately.
+
+The resulting empirical gap is narrower and more defensible: frozen logits can
+support a useful *partial* correction under unknown prior shift, but average
+improvement does not provide class-uniform safety. The next proposed method
+must detect or constrain harmful class-specific updates without target labels,
+while retaining E10's small-batch benefit. E11 is evidence for this problem
+definition, not yet evidence that the proposed correction is publishable.
+
 ## 6. Core hypotheses
 
 - **H1:** Frozen REVE embeddings and linear-probe performance change under
@@ -139,6 +154,11 @@ explicitly falsifies the method under unknown or shifted class proportions.
 - **H3:** Under harder convention changes where exact canonicalization is
   unavailable, gauge-consistency learning improves worst-reference performance
   without reducing clean-reference performance.
+- **H4:** Under unknown target class proportions, an operator-conditioned
+  correction can improve severe-shift error for every dominant class while
+  preserving random and balanced conditions. E11 supports the mean effect but
+  falsifies the current class-uniform version, motivating an explicit safety
+  constraint.
 
 ## 7. Go/no-go criteria
 
