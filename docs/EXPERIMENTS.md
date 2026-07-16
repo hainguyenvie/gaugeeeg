@@ -25,6 +25,7 @@ sanity check fails.
 | E10 | Known-prior/small-batch stress | `make set-prior-stress` | Prior confounding and topology-shrinkage decision |
 | E11 | Cross-subject prior identifiability | `make set-prior-identifiability` | Mean-vs-class-uniform robustness decision |
 | E12 | Source-only class/operator safeguard | `make set-class-safeguard` | Strict-split class-safety confirmation decision |
+| E13 | Post-hoc strongest-baseline audit | `make set-strong-baseline-audit` | Mean-only vs class-uniform advancement decision |
 
 ## E0 acceptance
 
@@ -379,3 +380,34 @@ The pre-push CPU screen passed the repeated-seed gate: severe RMSE changed from
 dominant-class point directions improved. The right-fist clustered interval
 was approximately [-0.0266, 0.0206], so the stronger paper-level class-uniform
 claim remains false pending repeated seeds and an external dataset.
+
+## E13 post-hoc strongest-baseline protocol
+
+- Consume the frozen E12 summary and metric table only. Do not refit E11, E12,
+  topology, or any target correction, and do not use target labels for a new
+  fitted quantity.
+- Compare E12 with fixed E10 shrinkage for continuity, but define strict E11
+  operator-confusion shrinkage and topology-only ridge as the two strong
+  baselines that must both be addressed.
+- Use paired 95% bootstrap intervals over batch repeats and held-out reference
+  identities. Broadcast the static topology estimate across repeats rather
+  than treating duplicated rows as independent observations.
+- Audit random `n=32`, balanced `n=128`, mean severe 70% skew, and every
+  severe dominant-class direction. Preserve BAcc and maximum recall gap within
+  fixed 0.01 noninferiority margins.
+- Eligibility for new independent seeds is deliberately weaker than
+  confirmation: require lower point RMSE than both strong baselines, task
+  noninferiority intervals, and no detected material harm. Report separately
+  whether all RMSE intervals are below zero.
+- A class-uniform candidate must also beat both strong baselines for every
+  dominant class and have no class-specific harm. Because this rule was
+  written after reviewing E12 seed 7, it can reject but cannot confirm a paper
+  claim.
+
+The pre-push audit found lower mean E12 RMSE against both strong baselines in
+all three regimes. The primary delta versus strict E11 was -0.0076 with 95%
+interval [-0.0193, 0.0033], so seed 7 alone does not confirm the mean claim.
+Balanced and severe mean intervals were below zero against both baselines.
+Right-fist-dominant E12 RMSE was worse than strict E11 by 0.0182, with interval
+[0.0006, 0.0361]. E13 therefore advances only the mean-method hypothesis to
+new probe seeds and rejects advancement of the current class-uniform claim.

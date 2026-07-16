@@ -352,6 +352,34 @@ def _class_safeguard_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _strong_baseline_command(args: argparse.Namespace) -> None:
+    from .strong_baseline import analyze_strong_baselines
+
+    result = analyze_strong_baselines(
+        args.e12_output,
+        args.output_dir,
+        bootstrap_resamples=args.bootstrap_resamples,
+        bootstrap_confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+        max_bacc_loss=args.max_bacc_loss,
+        max_gap_increase=args.max_gap_increase,
+    )
+    selected = result.loc[
+        (result["metric"] == "target_bias_rmse")
+        & result["baseline"].isin(
+            ["operator_confusion_shrinkage", "topology_ridge"]
+        ),
+        [
+            "comparison",
+            "baseline",
+            "candidate_minus_baseline",
+            "ci_lower",
+            "ci_upper",
+        ],
+    ]
+    print(selected.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -723,6 +751,25 @@ def build_parser() -> argparse.ArgumentParser:
     safeguard.add_argument("--max-mean-bacc-loss", type=float, default=0.01)
     safeguard.add_argument("--max-mean-gap-increase", type=float, default=0.01)
     safeguard.set_defaults(handler=_class_safeguard_command)
+
+    strong_baseline = subparsers.add_parser(
+        "strong-baseline-audit",
+        help="Audit E12 against strict E11 and topology-only baselines",
+    )
+    strong_baseline.add_argument(
+        "--e12-output",
+        default="outputs/reve_set_class_safeguard_audit_s7",
+    )
+    strong_baseline.add_argument(
+        "--output-dir",
+        default="outputs/reve_set_strong_baseline_audit_s7",
+    )
+    strong_baseline.add_argument("--bootstrap-resamples", type=int, default=5000)
+    strong_baseline.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    strong_baseline.add_argument("--bootstrap-seed", type=int, default=20260719)
+    strong_baseline.add_argument("--max-bacc-loss", type=float, default=0.01)
+    strong_baseline.add_argument("--max-gap-increase", type=float, default=0.01)
+    strong_baseline.set_defaults(handler=_strong_baseline_command)
     return parser
 
 

@@ -577,3 +577,27 @@ the working hypothesis or paper direction.
   the complete `outputs/reve_set_class_safeguard_audit_s7` directory, including
   `strict_prior_baseline`. If independently reproduced, proceed to repeated
   seeds and an external open EEG dataset rather than further seed-7 tuning.
+
+## 2026-07-16 — E12 reproduction review and E13 decision
+
+- The user pushed all 16 expected E12 artifacts, including the nested strict
+  E11 control. The committed run reproduced the strict 71--75 / 76--80 /
+  81--89 split and all split-disjointness checks.
+- E12 RMSE was 0.1983 at random `n=32`, 0.1927 at balanced `n=128`, and
+  0.2013 under mean severe skew. The corresponding strict E11 values were
+  0.2093, 0.2407, and 0.2797; topology-only RMSE was 0.2239.
+- Review identified a comparison limitation in the original E12 gate: it used
+  fixed E10 shrinkage as its paired class baseline even when strict E11 or
+  topology was stronger. E13 is a no-refit, post-hoc audit against both strong
+  controls using paired repeat-by-reference bootstrap intervals.
+- The E13 pre-push run found mean E12 point improvements against both strong
+  baselines in random, balanced, and severe regimes. The primary delta versus
+  strict E11 was -0.0076 with interval [-0.0193, 0.0033], so a single-seed
+  strong-baseline mean confirmation remains false.
+- Right-fist-dominant E12 was worse than strict E11 by 0.0182 RMSE, with
+  interval [0.0006, 0.0361]. Left-fist and both-fists also lacked intervals
+  below zero against topology, although no harm was detected for those two.
+- Decision: allow genuinely new probe seeds for a mean-only hypothesis, but do
+  not advance the current class-uniform method or paper claim. Since the E13
+  rule follows seed-7 inspection, it is falsification-only; it cannot convert
+  the existing result into confirmatory evidence.

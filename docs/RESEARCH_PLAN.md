@@ -157,6 +157,17 @@ right-fist clustered interval still crossed zero, so E12 is a promising
 single-seed screen that must be repeated and transferred to an external
 dataset before supporting a class-uniform paper claim.
 
+E13 then exposed a stronger limitation in that interpretation: improvement
+against E10's fixed shrinkage is not enough when either strict E11 or static
+topology is better for a particular regime or class. A post-hoc paired audit
+found that E12 improves mean RMSE against both strong baselines across random,
+balanced, and severe conditions, although the primary interval versus strict
+E11 still crosses zero. At class level, right-fist-dominant E12 is
+significantly worse than strict E11. The defensible next experiment is thus a
+new-seed confirmation of the mean-only claim. The present class-wise cap cannot
+support a class-uniform novelty claim without redesign on source data followed
+by validation on untouched external data.
+
 ## 6. Core hypotheses
 
 - **H1:** Frozen REVE embeddings and linear-probe performance change under
@@ -167,10 +178,10 @@ dataset before supporting a class-uniform paper claim.
   unavailable, gauge-consistency learning improves worst-reference performance
   without reducing clean-reference performance.
 - **H4:** Under unknown target class proportions, an operator-conditioned
-  correction can improve severe-shift error for every dominant class while
-  preserving random and balanced conditions. E12 supports this by point
-  estimate under a strict split, but right-fist uncertainty still blocks a
-  class-uniform claim.
+  correction can improve mean severe-shift error while preserving random and
+  balanced conditions. E13 makes this the current testable claim; improvement
+  for every dominant class is a separate, currently falsified hypothesis
+  because E12 harms right-fist performance relative to strict E11.
 
 ## 7. Go/no-go criteria
 
@@ -203,3 +214,6 @@ also produce no meaningful drift or downstream loss.
 - E12 is still one probe seed and one dataset. Its source-only caps are fixed
   before target audit, but external transfer and repeated-seed uncertainty are
   mandatory before a method claim.
+- E13's strongest-baseline rule was defined after inspecting seed 7. It may
+  eliminate unsupported claims, but only new probe seeds and an untouched
+  external dataset can provide confirmatory evidence.

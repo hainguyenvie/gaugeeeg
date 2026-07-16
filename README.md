@@ -685,3 +685,37 @@ not a paper-level class-uniform claim.
 Push the complete output directory. The decision file is
 `class_safeguard_summary.json`; do not omit its `strict_prior_baseline`
 subdirectory.
+
+## Post-hoc strongest-baseline audit
+
+E13 corrects an overly weak comparison in the original E12 gate. It does not
+refit a model. Instead, it reuses the complete E12 metrics and applies a paired
+repeat-by-reference bootstrap against both strict E11 operator-confusion
+shrinkage and the static topology-only predictor:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+make set-strong-baseline-audit
+```
+
+The audit is CPU-only and normally finishes in seconds after E12 exists. The
+pre-push screen found that E12 had lower mean RMSE than both strong baselines in
+random, balanced, and severe-skew regimes. At the primary random `n=32`
+condition, however, its RMSE delta versus strict E11 was -0.0076 with a paired
+95% interval of [-0.0193, 0.0033], so the single-seed mean result is not yet
+confirmed. More importantly, right-fist-dominant severe RMSE was 0.0182 higher
+than strict E11, with interval [0.0006, 0.0361]. The mean-only method is
+therefore eligible for genuinely new-seed confirmation, while the
+class-uniform claim is rejected for the current method.
+
+Because this stronger gate was defined after inspecting seed 7, E13 can
+falsify a claim but cannot confirm a paper claim. Push the three-file output:
+
+```text
+outputs/reve_set_strong_baseline_audit_s7
+```
+
+The decision file is `strong_baseline_summary.json`. Do not rerun or modify
+E12 while producing this audit.

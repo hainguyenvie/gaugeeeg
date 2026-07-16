@@ -1,4 +1,4 @@
-.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control set-bias-manifold set-prior-stress set-prior-identifiability set-class-safeguard
+.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control set-bias-manifold set-prior-stress set-prior-identifiability set-class-safeguard set-strong-baseline-audit
 
 install:
 	python -m pip install -e ".[data,dev]"
@@ -47,3 +47,6 @@ set-prior-identifiability:
 
 set-class-safeguard:
 	bash scripts/run_reve_set_class_safeguard.sh
+
+set-strong-baseline-audit:
+	bash scripts/run_reve_set_strong_baseline_audit.sh
