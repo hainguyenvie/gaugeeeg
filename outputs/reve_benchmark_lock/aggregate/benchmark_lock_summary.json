@@ -1,0 +1,75 @@
+{
+  "stage": "GaugeEEG frozen-REVE development benchmark lock",
+  "status": "development_baseline_selection_only",
+  "physionetmi_is_globally_untouched_test": false,
+  "historically_inspected_subjects": [
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109
+  ],
+  "external_dataset_required_for_confirmation": true,
+  "expected_probe_seeds": [
+    7,
+    21,
+    42
+  ],
+  "evaluation_views": [
+    "car",
+    "cz",
+    "pz",
+    "fz",
+    "native32@car",
+    "native32@cz",
+    "native32@pz",
+    "native32@fz",
+    "native16@car",
+    "native16@cz",
+    "native16@pz",
+    "native16@fz"
+  ],
+  "required_baselines": [
+    "car_only",
+    "reference_multiview_ce",
+    "structured_montage_ce",
+    "joint_multiview_ce",
+    "random_montage_ce",
+    "region_dropout_ce",
+    "joint_js_consistency"
+  ],
+  "primary_selection_metric": "mean BAcc over native16@{CAR,Cz,Pz,Fz}",
+  "clean_noninferiority_margin": 0.01,
+  "strongest_development_baseline": "joint_multiview_ce",
+  "selection_is_paper_confirmation": false,
+  "dataset_fingerprint": "bcc4ee2d6dbe1725",
+  "encoder_revisions": [
+    "fa9a2163a4b7c0a42c8e28b56077ef9c368944dc",
+    "befa5b57a455b77cf302daf610c2e9ed8140bace"
+  ],
+  "bootstrap_unit": "probe seed x subject",
+  "bootstrap_resamples": 10000,
+  "bootstrap_confidence": 0.95,
+  "output_files": {
+    "manifest": "outputs/reve_benchmark_lock/aggregate/baseline_manifest.csv",
+    "by_seed": "outputs/reve_benchmark_lock/aggregate/baseline_metrics_by_seed.csv",
+    "aggregate": "outputs/reve_benchmark_lock/aggregate/baseline_metrics_summary.csv",
+    "method_summary": "outputs/reve_benchmark_lock/aggregate/baseline_method_summary.csv",
+    "pairwise_bootstrap": "outputs/reve_benchmark_lock/aggregate/baseline_pairwise_bootstrap.csv"
+  }
+}
