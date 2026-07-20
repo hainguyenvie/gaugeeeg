@@ -1,0 +1,2 @@
+probe_seed,reference_seed,defense,probe_validation_balanced_accuracy,selected_epoch,prediction_split,n_prediction_trials
+21,7,spherical_spline,0.635403761061947,11,audit,1734
