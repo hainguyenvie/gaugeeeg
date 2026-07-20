@@ -793,29 +793,32 @@ cannot be relabeled as a rule-informed contribution. All arms train on subjects
 1--60, early-stop on 61--70, and are screened on development subjects 71--89.
 Reserved test subjects 90--109 remain unencoded and unscored.
 
+The completed decision file is
+`outputs/reve_set_operator_consistency_screen_s7/operator_consistency_summary.json`.
+E15 failed its predeclared gate. On `native16@CAR`, CAR-only, multi-view CE and
+operator consistency obtained BAcc 0.3470, 0.4561 and 0.4546 respectively.
+The rule arm improved over CAR-only but did not beat ordinary multi-view CE and
+missed clean-CAR noninferiority. The justified decision is therefore to retain
+multi-view CE as a baseline and drop the unsupported rule-loss claim.
+
+## Locked development baseline sweep
+
+E15 showed that ordinary multi-view CE, rather than its CAR-teacher KL term,
+explained the native-montage recovery. Before another custom method is designed,
+run the frozen-REVE baseline matrix across reference augmentation, structured
+and random native montage removal, motor-region dropout, joint augmentation,
+and a generic Jensen--Shannon consistency control:
+
 ```bash
 git pull
 source .venv/bin/activate
 make test
-make set-operator-consistency
+DEVICE=cuda make benchmark-baselines
 ```
 
-Use `DEVICE=cuda:1 make set-operator-consistency` for another GPU. Existing
-REVE features are reused when their cache keys match; native32/native16 training
-features may need to be encoded once. Push these four complete directories:
-
-```text
-outputs/reve_set_operator_screen_car_only_s7
-outputs/reve_set_operator_screen_multi_view_ce_s7
-outputs/reve_set_operator_screen_consistency_s7
-outputs/reve_set_operator_consistency_screen_s7
-```
-
-The decision file is `operator_consistency_summary.json`. Passing requires
-clean-CAR noninferiority, at least +0.02 native16 balanced accuracy versus
-CAR-only with a paired subject-bootstrap interval above zero, a positive
-interval versus multi-view CE, preserved native16 worst-class recall, and no
-native32 point loss. E15 is development-only. A pass freezes the method for a
-single multi-seed evaluation on the still-reserved test subjects; a failure
-keeps multi-view CE only if augmentation itself helps and otherwise stops this
-readout design.
+The sweep uses probe seeds 7/21/42 and scores only development subjects 71--89.
+PhysioNetMI subjects 90--109 were inspected in earlier E3--E8 work and are no
+longer described as a globally untouched paper test. A paper-level method must
+be confirmed on an external dataset. See
+[docs/BASELINE_PLAN.md](docs/BASELINE_PLAN.md) for the literature rationale,
+exact run matrix, primary metric, and required second-stage external baselines.

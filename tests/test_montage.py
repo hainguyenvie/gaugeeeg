@@ -75,6 +75,30 @@ class MontageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown montage"):
             apply_observation_view(self.x, self.names, "unknown@car")
 
+    def test_random_native_montages_are_deterministic_and_nested(self):
+        names = tuple(f"C{index}" for index in range(64))
+        mask_16 = montage_keep_mask(names, "random16_s101")
+        mask_32 = montage_keep_mask(names, "random32_s101")
+        repeated = montage_keep_mask(names, "random16_s101")
+        other_seed = montage_keep_mask(names, "random16_s202")
+
+        self.assertEqual(int(mask_16.sum()), 16)
+        self.assertEqual(int(mask_32.sum()), 32)
+        self.assertTrue(np.array_equal(mask_16, repeated))
+        self.assertTrue(np.all(mask_16 <= mask_32))
+        self.assertFalse(np.array_equal(mask_16, other_seed))
+
+    def test_random_native_view_removes_channels_before_car(self):
+        names = tuple(f"C{index}" for index in range(8))
+        x = np.arange(8 * 5, dtype=np.float64).reshape(1, 8, 5)
+        observed, observed_names = prepare_observation_view(
+            x, names, "native_random4_s7@car"
+        )
+
+        self.assertEqual(observed.shape, (1, 4, 5))
+        self.assertEqual(len(observed_names), 4)
+        np.testing.assert_allclose(observed.mean(axis=-2), 0.0, atol=1e-12)
+
 
 if __name__ == "__main__":
     unittest.main()

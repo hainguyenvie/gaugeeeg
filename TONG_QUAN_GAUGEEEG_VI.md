@@ -2,7 +2,8 @@
 
 > Tài liệu tổng hợp bằng tiếng Việt cho toàn bộ dự án GaugeEEG: ý tưởng nền
 > tảng, cơ sở khoa học, kiến trúc kỹ thuật, chuỗi thí nghiệm E0–E15, kết luận
-> từng bước và trạng thái hiện tại. Cập nhật đến commit `501c728` (E15).
+> từng bước và trạng thái hiện tại. Cập nhật đến kết quả E15 và kế hoạch khóa
+> benchmark frozen-REVE đa baseline.
 
 ---
 
@@ -400,7 +401,7 @@ chính xác đã dùng), `feature_cache/` (features đóng băng tái sử dụn
   `[−5, 5]` gây "false line-search failure", giữ log-sum-exp ổn định + L2 dương
   + backtracking; thêm regression test. Xem commit `d759668`.)
 
-### E15 — Nhất quán toán tử quan sát ở thời điểm huấn luyện (ĐANG CHỜ CHẠY)
+### E15 — Nhất quán toán tử quan sát ở thời điểm huấn luyện (ĐÃ CHẠY — FAIL)
 - **Pivot ý tưởng lên thượng nguồn (upstream):** thay vì hiệu chỉnh logit hậu
   nghiệm (dòng E8→E14 đã chết), **dạy** cho set-probe q4 rằng native32/native16
   là các **toán tử quan sát lồng nhau (nested observation operators)** của trial
@@ -426,18 +427,25 @@ chính xác đã dùng), `feature_cache/` (features đóng băng tái sử dụn
 - **Kiểm tra tính mới then chốt:** nếu multi-view CE **bằng hoặc thắng** operator
   consistency → bằng chứng ủng hộ augmentation, **KHÔNG** phải rule loss; không
   được báo cáo rule như đóng góp.
-- **Vai trò:** E15 chỉ **chọn/​bác bỏ phương pháp**. Một **pass** đóng băng code
-  + hyperparameter cho **một** đánh giá đa-seed E16 trên test dự trữ 90–109; một
-  **fail** giữ lại multi-view CE **chỉ nếu** bản thân augmentation có ích, ngược
-  lại **dừng** thiết kế readout này.
-- **Lệnh & artifact quyết định:**
+- **Kết quả chính (seed 7, audit 71–89):** trên `native16@CAR`, CAR-only =
+  **0.3470**, multi-view CE = **0.4561**, operator consistency = **0.4546**
+  BAcc. Operator consistency cải thiện so với CAR-only (**+0.1076**, CI 95%
+  **[+0.0674, +0.1506]**) nhưng không thắng multi-view CE (**−0.0015**, CI
+  **[−0.0195, +0.0175]**). Trên clean CAR, candidate cũng thấp hơn CAR-only
+  **−0.0102**, CI cắt 0 và không đạt gate noninferiority đã định trước.
+- **❌ Kết luận:** rule KL teacher không có bằng chứng mang giá trị vượt
+  augmentation thường. Giữ **multi-view CE** làm baseline hiện tại và bỏ tuyên
+  bố đóng góp rule của E15. Kết quả này chỉ chứng minh giới hạn của thiết kế
+  readout frozen-REVE cụ thể, không chứng minh giới hạn của mọi EEG foundation
+  model hay mọi phương pháp rule-informed.
+- **Lệnh tái lập & artifact quyết định:**
 
   ```bash
   make test
   make set-operator-consistency        # hoặc DEVICE=cuda:1 make set-operator-consistency
   ```
 
-  Quyết định ghi tại `operator_consistency_summary.json`. Bốn thư mục cần push:
+  Quyết định ghi tại `operator_consistency_summary.json`. Bốn thư mục artifact:
   `reve_set_operator_screen_car_only_s7`, `reve_set_operator_screen_multi_view_ce_s7`,
   `reve_set_operator_screen_consistency_s7`, `reve_set_operator_consistency_screen_s7`.
 
@@ -490,43 +498,35 @@ hơn cũng không gây trôi/giảm đáng kể.
 3. **Dòng hiệu chỉnh logit hậu nghiệm (E8 → E14) là ngõ cụt:** nó trông mạnh trên
    *một* probe fit nhưng **không chuyển giao** qua các seed tối ưu probe. E14 đã
    **bác bỏ dứt điểm H4** cho phương pháp E12.
-4. **E15 là pivot sống (H5):** đưa quy tắc toán-tử-quan-sát vào **thời điểm huấn
-   luyện** (KL teacher full-CAR tách gradient), với control quyết định là
-   multi-view CE thường để chứng minh rule loss có giá trị **vượt quá**
-   augmentation. Chỉ phát triển trên 71–89; test 90–109 khóa cho tới khi có kết
-   quả dương.
+4. **E15 đã bác bỏ H5 ở dạng hiện tại:** multi-view CE phục hồi native montage,
+   nhưng KL teacher full-CAR không thắng multi-view CE và không qua gate clean.
+5. **Công việc hiện tại:** khóa benchmark frozen-REVE với các baseline reference,
+   montage có cấu trúc/ngẫu nhiên, region dropout, joint augmentation và generic
+   JS consistency qua seed 7/21/42. Sau đó mới thiết kế phương pháp mới và xác
+   nhận trên một dataset ngoài PhysioNetMI.
 
-### 8.1. Trạng thái commit & câu hỏi "đã push nhưng chưa chạy?"
+### 8.1. Trạng thái kết quả E15
 
-- **Có — chính là E15.** Commit mới nhất **`501c728` "Add training-time operator
-  consistency screen (E15)"** đã được **push** (`HEAD` == `origin/main`, 0 ahead
-  / 0 behind) và bổ sung đầy đủ: `src/gaugeeeg/operator_consistency.py`, thay đổi
-  `set_probe.py`, `configs/reve_set_operator_consistency_q4.yaml`,
-  `scripts/run_reve_set_operator_consistency.sh`, tests, và cập nhật
-  README/EXPERIMENTS/RESEARCH_PLAN.
-- **Nhưng chưa chạy:** bốn thư mục output đã khai báo **đều chưa tồn tại** và
-  không có output nào liên quan operator được track trong `outputs/`:
-  - `outputs/reve_set_operator_screen_car_only_s7` — thiếu
-  - `outputs/reve_set_operator_screen_multi_view_ce_s7` — thiếu
-  - `outputs/reve_set_operator_screen_consistency_s7` — thiếu
-  - `outputs/reve_set_operator_consistency_screen_s7` — thiếu
-- Mọi thí nghiệm E1–E14 đều có **cặp commit "…results"** (hoặc số nhúng trong
-  doc). E15 **chỉ có commit setup**; chưa có `operator_consistency_summary.json`,
-  và mục E15 trong README là mục duy nhất **không** có tường thuật kết quả
-  ("pre-push run reduced…"). `conversation.md` cũng kết thúc ở phần mô tả **kế
-  hoạch** E15, không có mục kết quả.
+- E15 đã có đủ ba run CAR-only, multi-view CE và operator consistency cùng file
+  quyết định `outputs/reve_set_operator_consistency_screen_s7/operator_consistency_summary.json`.
+- Trường quyết định là
+  `operator_consistency_development_gate_supported: false`; khuyến nghị được lưu
+  là `retain_multiview_ce_drop_unjustified_rule_loss`.
+- Subjects 90–109 không được fit/score trong E15, nhưng vì đã được xem ở E3–E8,
+  chúng không còn là test paper hoàn toàn untouched. Cần dataset ngoài để xác
+  nhận paper-level.
 
-### 8.2. Điều kiện tiên quyết để chạy E15 (ghi chú môi trường)
+### 8.2. Lệnh khóa baseline tiếp theo
 
-- Runner `scripts/run_reve_set_operator_consistency.sh` **trước tiên xác minh**
-  summary E14 âm tính đã tồn tại (đã có), rồi chạy 3 nhánh + audit.
-- **Cần encoder REVE:** hiện tại `import reve` **thất bại** trong môi trường này,
-  và **chưa có** feature cache REVE trên đĩa (chỉ có cache của bandpower
-  pilot/smoke). E15 phải encode các view huấn luyện native32@car/native16@car
-  (subjects 1–60) và các view audit (71–89) → cần cài REVE + đăng nhập
-  HuggingFace với quyền `brain-bzh/reve-base`.
-- **GPU:** máy hiện có **RTX 3060 Laptop 6 GB** — README cảnh báo cache token và
-  thời gian GPU đáng kể; 6 GB có thể là hạn chế cho REVE-base.
+```bash
+make test
+DEVICE=cuda make benchmark-baselines
+```
+
+Runner ghi nhận chính xác fingerprint preprocessing, revision của REVE và
+position model, chỉ score development audit 71–89, rồi xếp hạng theo mean BAcc
+trên `native16@{CAR,Cz,Pz,Fz}` với ràng buộc clean CAR. Chi tiết và literature
+review nằm ở `docs/BASELINE_PLAN.md`.
 
 ---
 
@@ -563,7 +563,8 @@ hơn cũng không gây trôi/giảm đáng kể.
 | E12 | Class/operator safeguard | `make set-class-safeguard` | −42.3% severe; right-fist CI cắt 0 |
 | E13 | Strongest-baseline audit | `make set-strong-baseline-audit` | Chỉ mean-only đủ điều kiện |
 | E14 | Untouched probe seeds | `make set-probe-seed-confirmation` | ❌ bác bỏ (seed 21 trượt) |
-| **E15** | **Operator consistency (train-time)** | **`make set-operator-consistency`** | **⏳ ĐÃ PUSH — CHƯA CHẠY** |
+| **E15** | **Operator consistency (train-time)** | **`make set-operator-consistency`** | **❌ rule không thắng multi-view CE** |
+| **Khóa baseline** | **7 baseline × seed 7/21/42** | **`make benchmark-baselines`** | **⏳ code sẵn sàng, chờ GPU run** |
 
 ---
 

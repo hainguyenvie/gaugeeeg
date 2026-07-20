@@ -184,14 +184,19 @@ is a useful terminal limitation: a post-hoc logit correction can look strong
 for one fitted probe yet fail to transfer across probe optimization seeds.
 Further cap selection on the same audit pool would be post-hoc overfitting.
 
-E15 pivots the core idea upstream. The candidate teaches a
+E15 pivoted the core idea upstream. The candidate taught a
 variable-cardinality REVE set readout that native32/native16 are nested
 observation operators of the full-CAR trial. A detached full-CAR prediction is
 the source-only teacher for KL consistency, while every view retains its task
 label. The decisive baseline is identical supervised multi-view training
 without KL. This isolates whether operator structure contributes beyond data
-augmentation. Development subjects 71--89 can reject this hypothesis, but only
-the untouched 90--109 pool can evaluate a frozen positive method.
+augmentation. E15 rejected the candidate: it recovered native16 versus CAR-only
+but did not beat multi-view CE and missed the clean-CAR gate. Multi-view CE is
+therefore retained as a baseline, not relabeled as a rule contribution.
+
+Subjects 90--109 were already inspected in E3--E8, so they are not a globally
+untouched paper test. All PhysioNetMI work now has development status; an
+external dataset is required for paper-level confirmation.
 
 ## 6. Core hypotheses
 
@@ -208,8 +213,8 @@ the untouched 90--109 pool can evaluate a frozen positive method.
   correction across untouched probe seeds.
 - **H5:** Training-time CAR-teacher consistency improves native16 task accuracy
   beyond supervised multi-view augmentation while preserving clean CAR,
-  native32, and worst-class recall. E15 is the development-only test of this
-  replacement hypothesis.
+  native32, and worst-class recall. E15 rejected this hypothesis for the tested
+  frozen-REVE q4 readout.
 
 ## 7. Go/no-go criteria
 

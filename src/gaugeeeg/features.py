@@ -13,6 +13,7 @@ from scipy.signal import welch
 class Encoder(Protocol):
     name: str
     cache_signature: str
+    metadata: dict[str, str | float]
 
     def transform(
         self,
@@ -27,6 +28,7 @@ class BandpowerEncoder:
 
     name = "bandpower"
     cache_signature = "bandpower:v1"
+    metadata = {"encoder": "bandpower", "encoder_revision": "v1"}
 
     def __init__(self, bands: dict[str, tuple[float, float]] | None = None) -> None:
         self.bands = bands or {
@@ -72,6 +74,8 @@ class FrozenREVEEncoder:
         batch_size: int = 32,
         pooling: str = "attention",
         input_scale_uv: float = 100.0,
+        model_revision: str | None = None,
+        position_model_revision: str | None = None,
     ) -> None:
         try:
             import torch
@@ -91,8 +95,16 @@ class FrozenREVEEncoder:
         self.model_name = model_name
 
         try:
-            self.position_bank = AutoModel.from_pretrained(position_model_name, trust_remote_code=True)
-            self.model = AutoModel.from_pretrained(model_name, trust_remote_code=True)
+            self.position_bank = AutoModel.from_pretrained(
+                position_model_name,
+                revision=position_model_revision,
+                trust_remote_code=True,
+            )
+            self.model = AutoModel.from_pretrained(
+                model_name,
+                revision=model_revision,
+                trust_remote_code=True,
+            )
         except Exception as exc:
             raise RuntimeError(
                 "Could not load REVE. Accept the model agreement at "
@@ -100,7 +112,28 @@ class FrozenREVEEncoder:
             ) from exc
         self.position_bank.to(self.device).eval()
         self.model.to(self.device).eval()
-        self.cache_signature = f"reve:{model_name}:pool={pooling}:scale={self.input_scale_uv:g}:v2"
+        resolved_model_revision = str(
+            getattr(self.model.config, "_commit_hash", None) or model_revision or "unresolved"
+        )
+        resolved_position_revision = str(
+            getattr(self.position_bank.config, "_commit_hash", None)
+            or position_model_revision
+            or "unresolved"
+        )
+        self.metadata = {
+            "encoder": "reve",
+            "model_name": model_name,
+            "model_revision": resolved_model_revision,
+            "position_model_name": position_model_name,
+            "position_model_revision": resolved_position_revision,
+            "pooling": pooling,
+            "input_scale_uv": self.input_scale_uv,
+        }
+        self.cache_signature = (
+            f"reve:{model_name}@{resolved_model_revision}:"
+            f"positions={position_model_name}@{resolved_position_revision}:"
+            f"pool={pooling}:scale={self.input_scale_uv:g}:v3"
+        )
 
     @property
     def pretrained_query(self) -> NDArray[np.float32]:
@@ -173,5 +206,7 @@ def build_encoder(experiment_config: dict) -> Encoder:
             batch_size=int(experiment_config.get("batch_size", 32)),
             pooling=experiment_config.get("reve_pooling", "attention"),
             input_scale_uv=float(experiment_config.get("reve_input_scale_uv", 100.0)),
+            model_revision=experiment_config.get("model_revision"),
+            position_model_revision=experiment_config.get("position_model_revision"),
         )
     raise ValueError(f"Unknown encoder: {encoder_name}")

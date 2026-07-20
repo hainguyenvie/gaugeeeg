@@ -8,6 +8,8 @@ pass only those signals and coordinates to the encoder.
 
 from __future__ import annotations
 
+import hashlib
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -57,6 +59,16 @@ NATIVE_MONTAGE_ALIASES = {
     "native_drop_right_motor": "drop_right_motor",
 }
 
+_RANDOM_NATIVE_PATTERN = re.compile(r"native_random(?P<count>\d+)_s(?P<seed>\d+)$")
+_RANDOM_MONTAGE_PATTERN = re.compile(r"random(?P<count>\d+)_s(?P<seed>\d+)$")
+
+
+def _random_native_montage(montage_key: str) -> str | None:
+    match = _RANDOM_NATIVE_PATTERN.fullmatch(montage_key)
+    if match is None:
+        return None
+    return f"random{int(match.group('count'))}_s{int(match.group('seed'))}"
+
 
 def parse_observation_view(view: str) -> ObservationView:
     """Parse ``montage@reference`` or a legacy pure-reference view."""
@@ -69,11 +81,22 @@ def parse_observation_view(view: str) -> ObservationView:
     montage_key, reference = (part.strip().casefold() for part in name.split("@", maxsplit=1))
     if not montage_key or not reference:
         raise ValueError(f"Invalid observation view {view!r}; expected montage@reference")
-    channel_policy = "remove" if montage_key in NATIVE_MONTAGE_ALIASES else "zero"
-    montage = NATIVE_MONTAGE_ALIASES.get(montage_key, montage_key)
-    if montage not in SPARSE_MONTAGES and montage not in REGION_DROPS:
+    random_montage = _random_native_montage(montage_key)
+    channel_policy = (
+        "remove"
+        if montage_key in NATIVE_MONTAGE_ALIASES or random_montage is not None
+        else "zero"
+    )
+    montage = random_montage or NATIVE_MONTAGE_ALIASES.get(montage_key, montage_key)
+    if (
+        montage not in SPARSE_MONTAGES
+        and montage not in REGION_DROPS
+        and _RANDOM_MONTAGE_PATTERN.fullmatch(montage) is None
+    ):
         allowed = sorted([*SPARSE_MONTAGES, *REGION_DROPS, *NATIVE_MONTAGE_ALIASES])
-        raise ValueError(f"Unknown montage {montage!r}; expected one of {allowed}")
+        raise ValueError(
+            f"Unknown montage {montage!r}; expected one of {allowed} or native_random<N>_s<seed>"
+        )
     return ObservationView(
         name=name,
         reference=reference,
@@ -104,6 +127,21 @@ def montage_keep_mask(channel_names: Sequence[str], montage: str) -> NDArray[np.
         if missing:
             raise ValueError(f"Region drop {key} requires unavailable channels: {missing}")
         return np.asarray([name not in dropped for name in names], dtype=bool)
+    random_match = _RANDOM_MONTAGE_PATTERN.fullmatch(key)
+    if random_match is not None:
+        count = int(random_match.group("count"))
+        seed = int(random_match.group("seed"))
+        if not 1 <= count <= len(names):
+            raise ValueError(
+                f"Random montage requests {count} channels from an available set of {len(names)}"
+            )
+        material = f"{seed}|{'|'.join(names)}".encode()
+        digest = hashlib.sha256(material).digest()
+        local_seed = int.from_bytes(digest[:8], byteorder="little", signed=False)
+        order = np.random.default_rng(local_seed).permutation(len(names))
+        mask = np.zeros(len(names), dtype=bool)
+        mask[order[:count]] = True
+        return mask
     raise ValueError(f"Unknown montage: {montage}")
 
 

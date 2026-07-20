@@ -27,6 +27,8 @@ sanity check fails.
 | E12 | Source-only class/operator safeguard | `make set-class-safeguard` | Strict-split class-safety confirmation decision |
 | E13 | Post-hoc strongest-baseline audit | `make set-strong-baseline-audit` | Mean-only vs class-uniform advancement decision |
 | E14 | Untouched-probe-seed confirmation | `make set-probe-seed-confirmation` | Frozen mean-method multi-seed decision |
+| E15 | Training-time operator consistency | `make set-operator-consistency` | Rule-vs-augmentation falsification decision |
+| Baseline lock | Frozen-REVE baseline matrix | `make benchmark-baselines` | Multi-seed development leaderboard |
 
 ## E0 acceptance
 
@@ -489,3 +491,9 @@ The runner writes three arm directories and
 `outputs/reve_set_operator_consistency_screen_s7`. The latter contains the
 view-level metrics, paired comparisons, run manifest, and the frozen decision
 summary.
+
+E15 failed its predeclared gate. On `native16@CAR`, CAR-only, multi-view CE and
+operator consistency obtained BAcc 0.3470, 0.4561 and 0.4546 respectively.
+Operator consistency improved over CAR-only but not over multi-view CE, and it
+missed the clean-CAR gate. The valid conclusion is to retain ordinary
+multi-view augmentation as a baseline and drop the unsupported rule-loss claim.

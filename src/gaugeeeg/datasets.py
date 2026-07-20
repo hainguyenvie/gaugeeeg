@@ -50,8 +50,11 @@ def all_subjects(data_config: dict[str, Any]) -> list[int]:
     return sorted(subjects)
 
 
-def _cache_key(data_config: dict[str, Any]) -> str:
+def dataset_fingerprint(data_config: dict[str, Any]) -> str:
+    """Hash every preprocessing choice that can change trial tensors or labels."""
+
     relevant = {
+        "dataset": "physionet_eegmmidb:1.0.0",
         "subjects": all_subjects(data_config),
         "runs": data_config["runs"],
         "task": data_config.get("task", "four_class"),
@@ -125,7 +128,7 @@ def load_physionet_mi(data_config: dict[str, Any], *, force_recompute: bool = Fa
         raise ValueError("v0.1 implements only task: four_class")
 
     cache_dir = Path(data_config.get("cache_dir", "data/cache"))
-    cache_path = cache_dir / f"physionetmi_{_cache_key(data_config)}.npz"
+    cache_path = cache_dir / f"physionetmi_{dataset_fingerprint(data_config)}.npz"
     if cache_path.exists() and not force_recompute:
         print(f"Loading preprocessed dataset cache: {cache_path}")
         return _load_cache(cache_path)

@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .config import dump_config
-from .datasets import EEGDataset, load_physionet_mi
+from .datasets import EEGDataset, dataset_fingerprint, load_physionet_mi
 from .features import Encoder, build_encoder
 from .metrics import (
     classification_metrics_from_predictions,
@@ -21,11 +21,13 @@ from .metrics import (
 )
 from .montage import observation_metadata, parse_observation_view, prepare_observation_view
 from .referencing import common_average
+from .reproducibility import run_provenance
 
 
 def _feature_key(
     *,
     encoder_signature: str,
+    dataset_signature: str,
     split_name: str,
     subjects: list[int],
     view: str,
@@ -34,7 +36,9 @@ def _feature_key(
 ) -> str:
     payload = json.dumps(
         {
+            "feature_pipeline": "gaugeeeg-observation:v2",
             "encoder": encoder_signature,
+            "dataset": dataset_signature,
             "split": split_name,
             "subjects": subjects,
             "view": view,
@@ -59,6 +63,7 @@ def _extract_features(
     dataset: EEGDataset,
     *,
     encoder: Encoder,
+    dataset_signature: str,
     split_name: str,
     subject_ids: list[int],
     view: str,
@@ -70,6 +75,7 @@ def _extract_features(
     subset = dataset.subset(subject_ids)
     cache_key = _feature_key(
         encoder_signature=encoder.cache_signature,
+        dataset_signature=dataset_signature,
         split_name=split_name,
         subjects=subject_ids,
         view=view,
@@ -190,8 +196,15 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
 
     force_recompute = bool(experiment.get("force_recompute", False))
     dataset = load_physionet_mi(data_config, force_recompute=force_recompute)
+    data_signature = dataset_fingerprint(data_config)
     encoder = build_encoder(experiment)
+    encoder_metadata = getattr(
+        encoder,
+        "metadata",
+        {"encoder": encoder.name, "encoder_revision": encoder.cache_signature},
+    )
     feature_cache = Path(experiment.get("feature_cache_dir", output_dir / "feature_cache"))
+    provenance = run_provenance()
 
     splits = {
         "train": [int(v) for v in data_config["train_subjects"]],
@@ -251,6 +264,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             current_train_x, current_train_y = _extract_features(
                 dataset,
                 encoder=encoder,
+                dataset_signature=data_signature,
                 split_name="train",
                 subject_ids=splits["train"],
                 view=training_view,
@@ -262,6 +276,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             current_val_x, current_val_y = _extract_features(
                 dataset,
                 encoder=encoder,
+                dataset_signature=data_signature,
                 split_name="val",
                 subject_ids=splits["val"],
                 view=training_view,
@@ -435,6 +450,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                     features, labels = _extract_features(
                         dataset,
                         encoder=encoder,
+                        dataset_signature=data_signature,
                         split_name=prediction_cache_namespace,
                         subject_ids=prediction_subject_ids,
                         view=view,
@@ -489,6 +505,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             features, labels = _extract_features(
                 dataset,
                 encoder=encoder,
+                dataset_signature=data_signature,
                 split_name="test",
                 subject_ids=splits["test"],
                 view=view,
@@ -691,6 +708,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             "n_channels": len(dataset.channel_names),
             "sfreq": dataset.sfreq,
             "feature_cache_dir": str(feature_cache),
+            "dataset_fingerprint": data_signature,
+            "encoder_metadata": encoder_metadata,
+            "provenance": provenance,
             "metrics_path": str(output_dir / "metrics.csv"),
             "validation_predictions_path": str(
                 output_dir / "validation_predictions.csv"
@@ -765,6 +785,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "stress_effect_min_balanced_accuracy_drop": stress_threshold,
         "stress_effect_detected": bool(largest_drop >= stress_threshold),
         "feature_cache_dir": str(feature_cache),
+        "dataset_fingerprint": data_signature,
+        "encoder_metadata": encoder_metadata,
+        "provenance": provenance,
         "metrics_path": str(output_dir / "metrics.csv"),
         "predictions_path": str(output_dir / "predictions.csv") if prediction_frames else None,
         "validation_predictions_path": (

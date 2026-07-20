@@ -441,6 +441,20 @@ def _operator_consistency_command(args: argparse.Namespace) -> None:
     print(selected.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _baseline_benchmark_command(args: argparse.Namespace) -> None:
+    from .baseline_benchmark import analyze_baseline_benchmark
+
+    result = analyze_baseline_benchmark(
+        args.runs,
+        args.output_dir,
+        expected_seeds=args.expected_seeds,
+        bootstrap_resamples=args.bootstrap_resamples,
+        bootstrap_confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -923,6 +937,33 @@ def build_parser() -> argparse.ArgumentParser:
         "--maximum-worst-recall-loss", type=float, default=0.01
     )
     operator_consistency.set_defaults(handler=_operator_consistency_command)
+
+    baseline_benchmark = subparsers.add_parser(
+        "baseline-benchmark-audit",
+        help="Validate and aggregate the locked frozen-REVE baseline matrix",
+    )
+    baseline_benchmark.add_argument(
+        "--runs",
+        nargs="+",
+        required=True,
+        metavar="METHOD=PATH",
+    )
+    baseline_benchmark.add_argument(
+        "--output-dir", default="outputs/reve_benchmark_lock/aggregate"
+    )
+    baseline_benchmark.add_argument(
+        "--expected-seeds", nargs="+", type=int, default=[7, 21, 42]
+    )
+    baseline_benchmark.add_argument(
+        "--bootstrap-resamples", type=int, default=10000
+    )
+    baseline_benchmark.add_argument(
+        "--bootstrap-confidence", type=float, default=0.95
+    )
+    baseline_benchmark.add_argument(
+        "--bootstrap-seed", type=int, default=20260720
+    )
+    baseline_benchmark.set_defaults(handler=_baseline_benchmark_command)
     return parser
 
 
