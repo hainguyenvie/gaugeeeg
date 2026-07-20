@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .channel_adaptation import adapt_observation_channels, channel_adaptation_metadata
 from .config import dump_config
 from .datasets import EEGDataset, dataset_fingerprint, load_physionet_mi
 from .features import Encoder, build_encoder
@@ -20,7 +21,6 @@ from .metrics import (
     representation_metrics,
 )
 from .montage import observation_metadata, parse_observation_view, prepare_observation_view
-from .referencing import common_average
 from .reproducibility import run_provenance
 
 
@@ -36,7 +36,7 @@ def _feature_key(
 ) -> str:
     payload = json.dumps(
         {
-            "feature_pipeline": "gaugeeeg-observation:v2",
+            "feature_pipeline": "gaugeeeg-observation:v3",
             "encoder": encoder_signature,
             "dataset": dataset_signature,
             "split": split_name,
@@ -48,15 +48,6 @@ def _feature_key(
         sort_keys=True,
     ).encode()
     return hashlib.sha256(payload).hexdigest()[:16]
-
-
-def _defend(x_uv: np.ndarray, defense: str) -> np.ndarray:
-    key = defense.casefold()
-    if key == "none":
-        return x_uv
-    if key == "car_canonicalize":
-        return common_average(x_uv)
-    raise ValueError(f"Unknown defense: {defense}")
 
 
 def _extract_features(
@@ -93,8 +84,13 @@ def _extract_features(
         view,
         seed=seed,
     )
-    protected = _defend(referenced, defense)
-    features = encoder.transform(protected, observed_channel_names, subset.sfreq)
+    protected, adapted_channel_names = adapt_observation_channels(
+        referenced,
+        observed_channel_names,
+        subset.channel_names,
+        defense,
+    )
+    features = encoder.transform(protected, adapted_channel_names, subset.sfreq)
     cache_dir.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(cache_path, features=features, labels=subset.y)
     return features, subset.y
@@ -214,15 +210,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     if data_config.get("audit_subjects"):
         splits["audit"] = [int(v) for v in data_config["audit_subjects"]]
     prediction_split = "audit" if "audit" in splits else "val"
-    validation_predictions_only = bool(
-        experiment.get("validation_predictions_only", False)
-    )
-    if validation_predictions_only and not experiment.get(
-        "save_validation_predictions", False
-    ):
-        raise ValueError(
-            "validation_predictions_only requires save_validation_predictions"
-        )
+    validation_predictions_only = bool(experiment.get("validation_predictions_only", False))
+    if validation_predictions_only and not experiment.get("save_validation_predictions", False):
+        raise ValueError("validation_predictions_only requires save_validation_predictions")
     expected_classes = len(dataset.label_names)
     rows: list[dict[str, Any]] = []
     prediction_frames: list[pd.DataFrame] = []
@@ -237,9 +227,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     probe_objective = str(experiment.get("probe_objective", "car_only")).casefold()
     consistency_weight = float(experiment.get("consistency_weight", 0.0))
     views = [str(view) for view in experiment.get("test_views", ["car"])]
-    validation_prediction_views = [
-        str(view) for view in experiment.get("validation_prediction_views", views)
-    ]
+    validation_prediction_views = [str(view) for view in experiment.get("validation_prediction_views", views)]
     if not validation_prediction_views:
         raise ValueError("validation_prediction_views must not be empty")
     defenses = [str(defense) for defense in experiment.get("defenses", ["none"])]
@@ -288,9 +276,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             if train_y is None:
                 train_y = current_train_y
                 val_y = current_val_y
-            elif not np.array_equal(train_y, current_train_y) or not np.array_equal(
-                val_y, current_val_y
-            ):
+            elif not np.array_equal(train_y, current_train_y) or not np.array_equal(val_y, current_val_y):
                 raise RuntimeError("Train/validation label order changed across reference views")
             train_features.append(current_train_x)
             val_features.append(current_val_x)
@@ -375,9 +361,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                     ff_multiplier=int(experiment.get("set_ff_multiplier", 2)),
                     objective=probe_objective,
                     consistency_weight=consistency_weight,
-                    consistency_view_weights=experiment.get(
-                        "consistency_view_weights"
-                    ),
+                    consistency_view_weights=experiment.get("consistency_view_weights"),
                     **common_probe_kwargs,
                 )
             predictor = probe.model
@@ -397,9 +381,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                             "selected_epoch": selected_epoch,
                             "validation_balanced_accuracy": validation_score,
                             "validation_consistency_loss": validation_consistency_loss,
-                            "validation_prediction_disagreement": (
-                                validation_prediction_disagreement
-                            ),
+                            "validation_prediction_disagreement": (validation_prediction_disagreement),
                             "probe": probe_name,
                             "probe_seed": probe_seed,
                             "reference_seed": reference_seed,
@@ -407,9 +389,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                             "probe_objective": probe_objective,
                             "training_views": training_views,
                             "consistency_weight": consistency_weight,
-                            "consistency_view_weights": experiment.get(
-                                "consistency_view_weights"
-                            ),
+                            "consistency_view_weights": experiment.get("consistency_view_weights"),
                             "set_queries": int(experiment.get("set_queries", 0)),
                             "set_heads": int(experiment.get("set_heads", 0)),
                         },
@@ -434,14 +414,10 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             if prediction_split == "val":
                 validation_feature_by_view = {
                     training_view.casefold(): features
-                    for training_view, features in zip(
-                        training_views, val_features, strict=True
-                    )
+                    for training_view, features in zip(training_views, val_features, strict=True)
                 }
                 if not np.array_equal(prediction_labels, val_y):
-                    raise RuntimeError(
-                        "Validation prediction labels do not match probe validation"
-                    )
+                    raise RuntimeError("Validation prediction labels do not match probe validation")
             else:
                 validation_feature_by_view = {}
             for view in validation_prediction_views:
@@ -460,9 +436,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                         force_recompute=force_recompute,
                     )
                     if not np.array_equal(prediction_labels, labels):
-                        raise RuntimeError(
-                            "Prediction label order changed across reference views"
-                        )
+                        raise RuntimeError("Prediction label order changed across reference views")
                     validation_feature_by_view[key] = features
                 prediction, probability, logits = _predict_outputs(
                     predictor,
@@ -651,12 +625,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 )
 
     if validation_predictions_only:
-        output_predictions = pd.concat(
-            validation_prediction_frames, ignore_index=True
-        )
-        output_predictions.to_csv(
-            output_dir / "validation_predictions.csv", index=False
-        )
+        output_predictions = pd.concat(validation_prediction_frames, ignore_index=True)
+        output_predictions.to_csv(output_dir / "validation_predictions.csv", index=False)
         results = pd.DataFrame(validation_only_rows)
         results.to_csv(output_dir / "metrics.csv", index=False)
         subject_sets = {name: set(values) for name, values in splits.items()}
@@ -676,10 +646,10 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             "set_queries": int(experiment.get("set_queries", 0)),
             "set_heads": int(experiment.get("set_heads", 0)),
             "training_views": training_views,
+            "defenses": defenses,
+            "defense_metadata": {defense: channel_adaptation_metadata(defense) for defense in defenses},
             "consistency_weight": consistency_weight,
-            "consistency_view_weights": experiment.get(
-                "consistency_view_weights"
-            ),
+            "consistency_view_weights": experiment.get("consistency_view_weights"),
             "validation_prediction_views": validation_prediction_views,
             "validation_predictions_only": True,
             "prediction_split": prediction_split,
@@ -702,9 +672,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 validation_only_rows[0]["probe_validation_balanced_accuracy"]
             ),
             "selected_epoch": int(validation_only_rows[0]["selected_epoch"]),
-            "n_prediction_trials": int(
-                validation_only_rows[0]["n_prediction_trials"]
-            ),
+            "n_prediction_trials": int(validation_only_rows[0]["n_prediction_trials"]),
             "n_channels": len(dataset.channel_names),
             "sfreq": dataset.sfreq,
             "feature_cache_dir": str(feature_cache),
@@ -712,22 +680,16 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             "encoder_metadata": encoder_metadata,
             "provenance": provenance,
             "metrics_path": str(output_dir / "metrics.csv"),
-            "validation_predictions_path": str(
-                output_dir / "validation_predictions.csv"
-            ),
+            "validation_predictions_path": str(output_dir / "validation_predictions.csv"),
         }
-        with (output_dir / "summary.json").open(
-            "w", encoding="utf-8"
-        ) as handle:
+        with (output_dir / "summary.json").open("w", encoding="utf-8") as handle:
             json.dump(summary, handle, indent=2)
         return results
 
     results = pd.DataFrame(rows)
     results.to_csv(output_dir / "metrics.csv", index=False)
     if prediction_frames:
-        pd.concat(prediction_frames, ignore_index=True).to_csv(
-            output_dir / "predictions.csv", index=False
-        )
+        pd.concat(prediction_frames, ignore_index=True).to_csv(output_dir / "predictions.csv", index=False)
     if validation_prediction_frames:
         pd.concat(validation_prediction_frames, ignore_index=True).to_csv(
             output_dir / "validation_predictions.csv", index=False
@@ -742,9 +704,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     # Runs that sweep a defense without an undefended arm (e.g. defenses=[car_canonicalize])
     # have no "none" row, so score the gate against the defense the run actually used.
     undefended = car_rows.loc[car_rows["defense"] == "none"]
-    clean_bacc = float(
-        (undefended if not undefended.empty else car_rows)["balanced_accuracy"].iloc[0]
-    )
+    clean_bacc = float((undefended if not undefended.empty else car_rows)["balanced_accuracy"].iloc[0])
     gate_threshold = float(experiment.get("clean_gate_min_balanced_accuracy", 0.0))
     non_car = results[results["test_view"].str.lower() != "car"]
     if non_car.empty:
@@ -765,6 +725,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "strict_determinism": strict_determinism,
         "probe_objective": probe_objective,
         "training_views": training_views,
+        "defenses": defenses,
+        "defense_metadata": {defense: channel_adaptation_metadata(defense) for defense in defenses},
         "test_observation_views": views,
         "validation_prediction_views": validation_prediction_views,
         "consistency_weight": consistency_weight,
@@ -791,9 +753,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "metrics_path": str(output_dir / "metrics.csv"),
         "predictions_path": str(output_dir / "predictions.csv") if prediction_frames else None,
         "validation_predictions_path": (
-            str(output_dir / "validation_predictions.csv")
-            if validation_prediction_frames
-            else None
+            str(output_dir / "validation_predictions.csv") if validation_prediction_frames else None
         ),
         "subject_metrics_path": str(output_dir / "subject_metrics.csv"),
         "paired_subject_bootstrap_path": (

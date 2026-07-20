@@ -57,6 +57,7 @@ class BaselineBenchmarkTests(unittest.TestCase):
             ):
                 rows.append(
                     {
+                        "defense": "none",
                         "test_view": view,
                         "trial_index": trial_index,
                         "subject_id": subject,
@@ -87,6 +88,8 @@ class BaselineBenchmarkTests(unittest.TestCase):
             self.assertIn("clean_delta_ci_lower", result.columns)
             self.assertIn("clean_noninferiority_passed", result.columns)
             self.assertTrue((output / "baseline_pairwise_bootstrap.csv").exists())
+            pairwise = pd.read_csv(output / "baseline_pairwise_bootstrap.csv")
+            self.assertIn("native16_reference_mean", set(pairwise["test_view"]))
             summary = json.loads((output / "benchmark_lock_summary.json").read_text())
             self.assertFalse(summary["physionetmi_is_globally_untouched_test"])
             self.assertTrue(summary["external_dataset_required_for_confirmation"])

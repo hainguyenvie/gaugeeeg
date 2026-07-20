@@ -822,3 +822,20 @@ longer described as a globally untouched paper test. A paper-level method must
 be confirmed on an external dataset. See
 [docs/BASELINE_PLAN.md](docs/BASELINE_PLAN.md) for the literature rationale,
 exact run matrix, primary metric, and required second-stage external baselines.
+
+## Phase-B channel-adaptation screen
+
+The next locked screen tests an existing spherical-spline interpolation
+adapter against the Phase-A `car_only` and `joint_multiview_ce` controls. REVE
+remains frozen, and the adapter is explicitly a literature baseline rather
+than a GaugeEEG contribution:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+DEVICE=cuda make channel-adaptation
+```
+
+See [docs/PHASE_B_CHANNEL_ADAPTATION.md](docs/PHASE_B_CHANNEL_ADAPTATION.md)
+for the exact matrix, primary-metric bootstrap, and external-confirmation lock.

@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import balanced_accuracy_score, f1_score, recall_score
 
-
 EVALUATION_VIEWS = (
     "car",
     "cz",
@@ -51,9 +50,7 @@ BASELINE_SPECS: dict[str, BaselineSpec] = {
     "car_only": BaselineSpec(("car",), "car_only"),
     # Cz remains held out so this baseline measures reference generalization.
     "reference_multiview_ce": BaselineSpec(("car", "pz", "fz"), "multi_view_ce"),
-    "structured_montage_ce": BaselineSpec(
-        ("car", "native32@car", "native16@car"), "multi_view_ce"
-    ),
+    "structured_montage_ce": BaselineSpec(("car", "native32@car", "native16@car"), "multi_view_ce"),
     "joint_multiview_ce": BaselineSpec(JOINT_TRAINING_VIEWS, "multi_view_ce"),
     # Three deterministic random nested 64->32->16 layouts approximate random
     # channel-dropout augmentation without zero padding.
@@ -75,9 +72,7 @@ BASELINE_SPECS: dict[str, BaselineSpec] = {
     ),
     # Generic generalized Jensen-Shannon consistency is deliberately not
     # presented as a GaugeEEG rule contribution.
-    "joint_js_consistency": BaselineSpec(
-        JOINT_TRAINING_VIEWS, "rule_consistency", consistency_weight=1.0
-    ),
+    "joint_js_consistency": BaselineSpec(JOINT_TRAINING_VIEWS, "rule_consistency", consistency_weight=1.0),
 }
 
 EXPECTED_TRAIN = tuple(range(1, 61))
@@ -113,35 +108,32 @@ def _normalize_views(values: list[str] | tuple[str, ...]) -> tuple[str, ...]:
 def _validate_run(
     method: str,
     run_dir: Path,
+    *,
+    spec: BaselineSpec | None = None,
+    expected_defense: str = "none",
 ) -> tuple[dict[str, Any], dict[str, pd.DataFrame]]:
     summary_path = run_dir / "summary.json"
     predictions_path = run_dir / "validation_predictions.csv"
     if not summary_path.exists() or not predictions_path.exists():
         raise FileNotFoundError(f"Incomplete baseline run: {run_dir}")
     summary = _load_json(summary_path)
-    spec = BASELINE_SPECS[method]
+    spec = BASELINE_SPECS[method] if spec is None else spec
     checks = {
         "validation_only": summary.get("validation_predictions_only") is True,
         "prediction_split": summary.get("prediction_split") == "audit",
-        "test_not_scored": summary.get(
-            "physionet_test_subjects_used_for_fitting_or_scoring"
-        )
-        is False,
+        "test_not_scored": summary.get("physionet_test_subjects_used_for_fitting_or_scoring") is False,
         "pairwise_disjoint": summary.get("all_subject_splits_pairwise_disjoint") is True,
         "q4": summary.get("set_queries") == 4,
         "objective": summary.get("probe_objective") == spec.objective,
         "training_views": _normalize_views(summary.get("training_views", []))
         == _normalize_views(spec.training_views),
-        "evaluation_views": set(
-            _normalize_views(summary.get("validation_prediction_views", []))
-        )
+        "evaluation_views": set(_normalize_views(summary.get("validation_prediction_views", [])))
         == set(EVALUATION_VIEWS),
         "consistency_weight": np.isclose(
             float(summary.get("consistency_weight", 0.0)), spec.consistency_weight
         ),
         "train_split": tuple(summary.get("train_subjects", [])) == EXPECTED_TRAIN,
-        "probe_validation_split": tuple(summary.get("probe_validation_subjects", []))
-        == EXPECTED_VALIDATION,
+        "probe_validation_split": tuple(summary.get("probe_validation_subjects", [])) == EXPECTED_VALIDATION,
         "audit_split": tuple(summary.get("audit_subjects", [])) == EXPECTED_AUDIT,
         "historical_test_field": tuple(summary.get("reserved_test_subjects", []))
         == HISTORICALLY_INSPECTED_TEST,
@@ -151,20 +143,21 @@ def _validate_run(
         raise ValueError(f"Baseline run {run_dir} failed locked checks: {failed}")
 
     predictions = pd.read_csv(predictions_path)
-    required = {"test_view", "trial_index", "subject_id", "y_true", "y_pred"}
+    required = {"defense", "test_view", "trial_index", "subject_id", "y_true", "y_pred"}
     missing = sorted(required - set(predictions.columns))
     if missing:
         raise ValueError(f"Missing prediction columns in {predictions_path}: {missing}")
     predictions["test_view"] = predictions["test_view"].str.casefold()
+    observed_defenses = set(predictions["defense"].astype(str).str.casefold())
+    if observed_defenses != {expected_defense.casefold()}:
+        raise ValueError(f"Unexpected defenses in {predictions_path}: {sorted(observed_defenses)}")
     if set(predictions["test_view"]) != set(EVALUATION_VIEWS):
         raise ValueError(f"Unexpected evaluation grid in {predictions_path}")
 
     by_view: dict[str, pd.DataFrame] = {}
     alignment: pd.DataFrame | None = None
     for view in EVALUATION_VIEWS:
-        frame = predictions.loc[predictions["test_view"] == view].sort_values(
-            ["trial_index"]
-        )
+        frame = predictions.loc[predictions["test_view"] == view].sort_values(["trial_index"])
         key = frame[["trial_index", "subject_id", "y_true"]].reset_index(drop=True)
         if alignment is None:
             alignment = key
@@ -242,13 +235,93 @@ def _hierarchical_bacc_delta(
             )
             labels = candidate_frame["y_true"].to_numpy(dtype=np.int64)[positions]
             seed_deltas.append(
-                balanced_accuracy_score(
-                    labels, candidate_frame["y_pred"].to_numpy(dtype=np.int64)[positions]
-                )
+                balanced_accuracy_score(labels, candidate_frame["y_pred"].to_numpy(dtype=np.int64)[positions])
                 - balanced_accuracy_score(
                     labels, baseline_frame["y_pred"].to_numpy(dtype=np.int64)[positions]
                 )
             )
+        draws[draw_index] = float(np.mean(seed_deltas))
+    alpha = (1.0 - confidence) / 2.0
+    return {
+        "n_probe_seeds": len(probe_seeds),
+        "n_resamples": n_resamples,
+        "confidence": confidence,
+        "candidate_minus_baseline": float(np.mean(point_deltas)),
+        "bootstrap_mean": float(draws.mean()),
+        "ci_lower": float(np.quantile(draws, alpha)),
+        "ci_upper": float(np.quantile(draws, 1.0 - alpha)),
+    }
+
+
+def _balanced_accuracy(labels: np.ndarray, predictions: np.ndarray) -> float:
+    recalls = [
+        float(np.mean(predictions[labels == class_index] == class_index)) for class_index in np.unique(labels)
+    ]
+    return float(np.mean(recalls))
+
+
+def _hierarchical_bacc_delta_views(
+    candidate: dict[int, dict[str, pd.DataFrame]],
+    baseline: dict[int, dict[str, pd.DataFrame]],
+    *,
+    views: tuple[str, ...],
+    n_resamples: int,
+    confidence: float,
+    seed: int,
+) -> dict[str, float | int]:
+    """Bootstrap the mean view-level BAcc delta with paired seed/subject draws."""
+
+    probe_seeds = sorted(candidate)
+    if probe_seeds != sorted(baseline):
+        raise ValueError("Candidate and baseline probe seeds differ")
+    keys = ["trial_index", "subject_id", "y_true"]
+    point_deltas: list[float] = []
+    for probe_seed in probe_seeds:
+        view_deltas = []
+        for view in views:
+            candidate_frame = candidate[probe_seed][view]
+            baseline_frame = baseline[probe_seed][view]
+            if not candidate_frame[keys].equals(baseline_frame[keys]):
+                raise ValueError("Candidate and baseline predictions are not paired")
+            labels = candidate_frame["y_true"].to_numpy(dtype=np.int64)
+            view_deltas.append(
+                _balanced_accuracy(labels, candidate_frame["y_pred"].to_numpy(dtype=np.int64))
+                - _balanced_accuracy(labels, baseline_frame["y_pred"].to_numpy(dtype=np.int64))
+            )
+        point_deltas.append(float(np.mean(view_deltas)))
+
+    rng = np.random.default_rng(seed)
+    draws = np.empty(n_resamples, dtype=np.float64)
+    for draw_index in range(n_resamples):
+        sampled_seeds = rng.choice(probe_seeds, size=len(probe_seeds), replace=True)
+        seed_deltas = []
+        for sampled_seed in sampled_seeds:
+            probe_seed = int(sampled_seed)
+            first_frame = candidate[probe_seed][views[0]]
+            subjects = first_frame["subject_id"].unique()
+            sampled_subjects = rng.choice(subjects, size=subjects.size, replace=True)
+            positions = np.concatenate(
+                [
+                    np.flatnonzero(first_frame["subject_id"].to_numpy() == subject)
+                    for subject in sampled_subjects
+                ]
+            )
+            view_deltas = []
+            for view in views:
+                candidate_frame = candidate[probe_seed][view]
+                baseline_frame = baseline[probe_seed][view]
+                labels = candidate_frame["y_true"].to_numpy(dtype=np.int64)[positions]
+                view_deltas.append(
+                    _balanced_accuracy(
+                        labels,
+                        candidate_frame["y_pred"].to_numpy(dtype=np.int64)[positions],
+                    )
+                    - _balanced_accuracy(
+                        labels,
+                        baseline_frame["y_pred"].to_numpy(dtype=np.int64)[positions],
+                    )
+                )
+            seed_deltas.append(float(np.mean(view_deltas)))
         draws[draw_index] = float(np.mean(seed_deltas))
     alpha = (1.0 - confidence) / 2.0
     return {
@@ -310,8 +383,7 @@ def analyze_baseline_benchmark(
                 }
             )
             rows.extend(
-                _metric_row(method, run_dir, probe_seed, view, by_view[view])
-                for view in EVALUATION_VIEWS
+                _metric_row(method, run_dir, probe_seed, view, by_view[view]) for view in EVALUATION_VIEWS
             )
         if observed_seeds != expected_seed_set:
             raise ValueError(
@@ -363,6 +435,23 @@ def analyze_baseline_benchmark(
                 bootstrap_rows.append(
                     {"candidate": candidate, "baseline": baseline, "test_view": view, **result}
                 )
+            native16_views = tuple(view for view in EVALUATION_VIEWS if view.startswith("native16@"))
+            result = _hierarchical_bacc_delta_views(
+                frames[candidate],
+                frames[baseline],
+                views=native16_views,
+                n_resamples=bootstrap_resamples,
+                confidence=bootstrap_confidence,
+                seed=bootstrap_seed + len(primary_views),
+            )
+            bootstrap_rows.append(
+                {
+                    "candidate": candidate,
+                    "baseline": baseline,
+                    "test_view": "native16_reference_mean",
+                    **result,
+                }
+            )
     pairwise = pd.DataFrame(bootstrap_rows)
     pairwise.to_csv(output / "baseline_pairwise_bootstrap.csv", index=False)
 
@@ -396,15 +485,9 @@ def analyze_baseline_benchmark(
                 "clean_delta_vs_car_only": clean_delta,
                 "clean_delta_ci_lower": clean_ci_lower,
                 "clean_delta_ci_upper": clean_ci_upper,
-                "clean_noninferiority_passed": bool(
-                    clean_delta >= -0.01 and clean_ci_lower >= -0.01
-                ),
-                "native32_car_bacc": float(
-                    selected.loc["native32@car", "balanced_accuracy_mean"]
-                ),
-                "native16_car_bacc": float(
-                    selected.loc["native16@car", "balanced_accuracy_mean"]
-                ),
+                "clean_noninferiority_passed": bool(clean_delta >= -0.01 and clean_ci_lower >= -0.01),
+                "native32_car_bacc": float(selected.loc["native32@car", "balanced_accuracy_mean"]),
+                "native16_car_bacc": float(selected.loc["native16@car", "balanced_accuracy_mean"]),
                 "full_reference_bacc_mean": float(
                     selected.loc[["car", "cz", "pz", "fz"], "balanced_accuracy_mean"].mean()
                 ),

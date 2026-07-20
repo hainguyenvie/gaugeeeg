@@ -366,9 +366,7 @@ def _strong_baseline_command(args: argparse.Namespace) -> None:
     )
     selected = result.loc[
         (result["metric"] == "target_bias_rmse")
-        & result["baseline"].isin(
-            ["operator_confusion_shrinkage", "topology_ridge"]
-        ),
+        & result["baseline"].isin(["operator_confusion_shrinkage", "topology_ridge"]),
         [
             "comparison",
             "baseline",
@@ -396,9 +394,7 @@ def _probe_seed_confirmation_command(args: argparse.Namespace) -> None:
         max_gap_increase=args.max_gap_increase,
     )
     selected = result.loc[
-        result["comparison"].isin(
-            ["primary_random", "balanced_stress_size", "severe_skew"]
-        )
+        result["comparison"].isin(["primary_random", "balanced_stress_size", "severe_skew"])
         & (result["metric"] == "target_bias_rmse"),
         [
             "comparison",
@@ -445,6 +441,20 @@ def _baseline_benchmark_command(args: argparse.Namespace) -> None:
     from .baseline_benchmark import analyze_baseline_benchmark
 
     result = analyze_baseline_benchmark(
+        args.runs,
+        args.output_dir,
+        expected_seeds=args.expected_seeds,
+        bootstrap_resamples=args.bootstrap_resamples,
+        bootstrap_confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
+def _channel_adaptation_benchmark_command(args: argparse.Namespace) -> None:
+    from .channel_adaptation_benchmark import analyze_channel_adaptation_benchmark
+
+    result = analyze_channel_adaptation_benchmark(
         args.runs,
         args.output_dir,
         expected_seeds=args.expected_seeds,
@@ -534,9 +544,7 @@ def build_parser() -> argparse.ArgumentParser:
     aggregate_methods.add_argument("--consistencies", nargs="+", required=True)
     aggregate_methods.add_argument("--target-view", default="cz")
     aggregate_methods.add_argument("--target-class", type=int, default=0)
-    aggregate_methods.add_argument(
-        "--output-dir", default="outputs/reve_consistency_comparison_multiseed"
-    )
+    aggregate_methods.add_argument("--output-dir", default="outputs/reve_consistency_comparison_multiseed")
     aggregate_methods.add_argument("--bootstrap-resamples", type=int, default=10000)
     aggregate_methods.add_argument("--bootstrap-confidence", type=float, default=0.95)
     aggregate_methods.add_argument("--bootstrap-seed", type=int, default=20260714)
@@ -556,9 +564,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     lambda_ablation.add_argument("--target-view", default="cz")
     lambda_ablation.add_argument("--target-class", type=int, default=0)
-    lambda_ablation.add_argument(
-        "--output-dir", default="outputs/reve_consistency_lambda_ablation"
-    )
+    lambda_ablation.add_argument("--output-dir", default="outputs/reve_consistency_lambda_ablation")
     lambda_ablation.add_argument("--bootstrap-resamples", type=int, default=10000)
     lambda_ablation.add_argument("--bootstrap-confidence", type=float, default=0.95)
     lambda_ablation.add_argument("--bootstrap-seed", type=int, default=20260714)
@@ -758,20 +764,12 @@ def build_parser() -> argparse.ArgumentParser:
     identifiability.add_argument("--adaptation-seed", type=int, default=20260717)
     identifiability.add_argument("--ridge-alpha", type=float, default=1.0)
     identifiability.add_argument("--l2", type=float, default=1e-4)
-    identifiability.add_argument(
-        "--confusion-regularization", type=float, default=1.0
-    )
-    identifiability.add_argument(
-        "--weak-confusion-regularization", type=float, default=0.1
-    )
+    identifiability.add_argument("--confusion-regularization", type=float, default=1.0)
+    identifiability.add_argument("--weak-confusion-regularization", type=float, default=0.1)
     identifiability.add_argument("--bootstrap-resamples", type=int, default=2000)
     identifiability.add_argument("--bootstrap-confidence", type=float, default=0.95)
-    identifiability.add_argument(
-        "--max-primary-rmse-increase", type=float, default=0.05
-    )
-    identifiability.add_argument(
-        "--minimum-severe-rmse-reduction", type=float, default=0.05
-    )
+    identifiability.add_argument("--max-primary-rmse-increase", type=float, default=0.05)
+    identifiability.add_argument("--minimum-severe-rmse-reduction", type=float, default=0.05)
     identifiability.add_argument("--max-mean-bacc-loss", type=float, default=0.01)
     identifiability.add_argument("--max-mean-gap-increase", type=float, default=0.01)
     identifiability.set_defaults(handler=_prior_identifiability_command)
@@ -822,12 +820,8 @@ def build_parser() -> argparse.ArgumentParser:
     safeguard.add_argument("--cap-ridge", type=float, default=1e-8)
     safeguard.add_argument("--bootstrap-resamples", type=int, default=2000)
     safeguard.add_argument("--bootstrap-confidence", type=float, default=0.95)
-    safeguard.add_argument(
-        "--max-primary-rmse-increase", type=float, default=0.05
-    )
-    safeguard.add_argument(
-        "--minimum-severe-rmse-reduction", type=float, default=0.05
-    )
+    safeguard.add_argument("--max-primary-rmse-increase", type=float, default=0.05)
+    safeguard.add_argument("--minimum-severe-rmse-reduction", type=float, default=0.05)
     safeguard.add_argument("--max-mean-bacc-loss", type=float, default=0.01)
     safeguard.add_argument("--max-mean-gap-increase", type=float, default=0.01)
     safeguard.set_defaults(handler=_class_safeguard_command)
@@ -857,10 +851,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     probe_confirmation.add_argument(
         "--frozen-e13-summary",
-        default=(
-            "outputs/reve_set_strong_baseline_audit_s7/"
-            "strong_baseline_summary.json"
-        ),
+        default=("outputs/reve_set_strong_baseline_audit_s7/strong_baseline_summary.json"),
     )
     probe_confirmation.add_argument(
         "--logit-runs",
@@ -882,22 +873,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default="outputs/reve_set_probe_seed_confirmation",
     )
-    probe_confirmation.add_argument(
-        "--exploratory-probe-seed", type=int, default=7
-    )
-    probe_confirmation.add_argument(
-        "--bootstrap-resamples", type=int, default=10000
-    )
-    probe_confirmation.add_argument(
-        "--bootstrap-confidence", type=float, default=0.95
-    )
-    probe_confirmation.add_argument(
-        "--bootstrap-seed", type=int, default=20260720
-    )
+    probe_confirmation.add_argument("--exploratory-probe-seed", type=int, default=7)
+    probe_confirmation.add_argument("--bootstrap-resamples", type=int, default=10000)
+    probe_confirmation.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    probe_confirmation.add_argument("--bootstrap-seed", type=int, default=20260720)
     probe_confirmation.add_argument("--max-bacc-loss", type=float, default=0.01)
-    probe_confirmation.add_argument(
-        "--max-gap-increase", type=float, default=0.01
-    )
+    probe_confirmation.add_argument("--max-gap-increase", type=float, default=0.01)
     probe_confirmation.set_defaults(handler=_probe_seed_confirmation_command)
 
     operator_consistency = subparsers.add_parser(
@@ -906,10 +887,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     operator_consistency.add_argument(
         "--e14-summary",
-        default=(
-            "outputs/reve_set_probe_seed_confirmation/"
-            "probe_seed_confirmation_summary.json"
-        ),
+        default=("outputs/reve_set_probe_seed_confirmation/probe_seed_confirmation_summary.json"),
     )
     operator_consistency.add_argument("--car-only-run", required=True)
     operator_consistency.add_argument("--multi-view-run", required=True)
@@ -918,24 +896,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default="outputs/reve_set_operator_consistency_screen_s7",
     )
-    operator_consistency.add_argument(
-        "--bootstrap-resamples", type=int, default=5000
-    )
-    operator_consistency.add_argument(
-        "--bootstrap-confidence", type=float, default=0.95
-    )
-    operator_consistency.add_argument(
-        "--bootstrap-seed", type=int, default=20260721
-    )
-    operator_consistency.add_argument(
-        "--minimum-native16-bacc-gain", type=float, default=0.02
-    )
-    operator_consistency.add_argument(
-        "--maximum-clean-bacc-loss", type=float, default=0.01
-    )
-    operator_consistency.add_argument(
-        "--maximum-worst-recall-loss", type=float, default=0.01
-    )
+    operator_consistency.add_argument("--bootstrap-resamples", type=int, default=5000)
+    operator_consistency.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    operator_consistency.add_argument("--bootstrap-seed", type=int, default=20260721)
+    operator_consistency.add_argument("--minimum-native16-bacc-gain", type=float, default=0.02)
+    operator_consistency.add_argument("--maximum-clean-bacc-loss", type=float, default=0.01)
+    operator_consistency.add_argument("--maximum-worst-recall-loss", type=float, default=0.01)
     operator_consistency.set_defaults(handler=_operator_consistency_command)
 
     baseline_benchmark = subparsers.add_parser(
@@ -948,22 +914,29 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         metavar="METHOD=PATH",
     )
-    baseline_benchmark.add_argument(
-        "--output-dir", default="outputs/reve_benchmark_lock/aggregate"
-    )
-    baseline_benchmark.add_argument(
-        "--expected-seeds", nargs="+", type=int, default=[7, 21, 42]
-    )
-    baseline_benchmark.add_argument(
-        "--bootstrap-resamples", type=int, default=10000
-    )
-    baseline_benchmark.add_argument(
-        "--bootstrap-confidence", type=float, default=0.95
-    )
-    baseline_benchmark.add_argument(
-        "--bootstrap-seed", type=int, default=20260720
-    )
+    baseline_benchmark.add_argument("--output-dir", default="outputs/reve_benchmark_lock/aggregate")
+    baseline_benchmark.add_argument("--expected-seeds", nargs="+", type=int, default=[7, 21, 42])
+    baseline_benchmark.add_argument("--bootstrap-resamples", type=int, default=10000)
+    baseline_benchmark.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    baseline_benchmark.add_argument("--bootstrap-seed", type=int, default=20260720)
     baseline_benchmark.set_defaults(handler=_baseline_benchmark_command)
+
+    channel_adaptation = subparsers.add_parser(
+        "channel-adaptation-audit",
+        help="Validate and compare the locked Phase-B spherical-spline runs",
+    )
+    channel_adaptation.add_argument(
+        "--runs",
+        nargs="+",
+        required=True,
+        metavar="METHOD=PATH",
+    )
+    channel_adaptation.add_argument("--output-dir", default="outputs/reve_channel_adaptation/aggregate")
+    channel_adaptation.add_argument("--expected-seeds", nargs="+", type=int, default=[7, 21, 42])
+    channel_adaptation.add_argument("--bootstrap-resamples", type=int, default=10000)
+    channel_adaptation.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    channel_adaptation.add_argument("--bootstrap-seed", type=int, default=20260721)
+    channel_adaptation.set_defaults(handler=_channel_adaptation_benchmark_command)
     return parser
 
 
