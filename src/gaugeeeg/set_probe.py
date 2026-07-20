@@ -107,7 +107,12 @@ def fit_reve_set_probe(
         raise ValueError(f"{objective} requires at least two aligned observation views")
     if consistency_weight < 0.0:
         raise ValueError("consistency_weight must be non-negative")
-    if consistency_view_weights is None:
+    if consistency_view_weights is None or objective == "car_only":
+        # The car_only control trains on a single view and applies no
+        # consistency term, so any globally configured multi-view weights are
+        # irrelevant to it. Derive matching per-view weights from train_views
+        # instead of failing the length check when the config carries weights
+        # sized for the multi-montage arms.
         view_weights = np.asarray(
             [0.0, *([1.0] * (len(train_views) - 1))], dtype=np.float64
         )
