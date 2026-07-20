@@ -1,0 +1,4 @@
+method,run_dir,probe_seed,reference_seed,selected_epoch,probe_validation_balanced_accuracy,test_subjects_used
+car_only,outputs/reve_set_operator_screen_car_only_s7,7,7,19,0.6787878388818653,False
+multi_view_ce,outputs/reve_set_operator_screen_multi_view_ce_s7,7,7,16,0.5701949594980569,False
+operator_consistency,outputs/reve_set_operator_screen_consistency_s7,7,7,14,0.578526039471836,False
