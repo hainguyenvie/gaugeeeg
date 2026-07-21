@@ -70,6 +70,21 @@ def validate_config(config: dict[str, Any]) -> None:
             raise ValueError("set_queries must be positive")
         if int(experiment.get("set_heads", 8)) < 1:
             raise ValueError("set_heads must be positive")
+    probe_auxiliary = str(experiment.get("probe_auxiliary", "none")).casefold()
+    allowed_auxiliary = {
+        "none",
+        "spectral_capacity_control",
+        "gqba_odd",
+        "gqba_odd_even",
+    }
+    if probe_auxiliary not in allowed_auxiliary:
+        raise ValueError(f"Unknown probe_auxiliary; expected {sorted(allowed_auxiliary)}")
+    if probe_auxiliary != "none" and probe != "reve_set":
+        raise ValueError("GQBA auxiliary representations require probe: reve_set")
+    if int(experiment.get("auxiliary_queries", 2)) < 1:
+        raise ValueError("auxiliary_queries must be positive")
+    if int(experiment.get("auxiliary_hidden_dim", 64)) < 1:
+        raise ValueError("auxiliary_hidden_dim must be positive")
     training_views = [str(view).casefold() for view in experiment.get("training_views", ["car"])]
     if not training_views or training_views[0] != "car":
         raise ValueError("training_views must start with 'car'")
@@ -97,31 +112,18 @@ def validate_config(config: dict[str, Any]) -> None:
             )
         ]
         if len(weights) != len(training_views):
-            raise ValueError(
-                "operator_consistency requires one consistency_view_weight per training view"
-            )
-        if (
-            weights[0] != 0.0
-            or any(not math.isfinite(value) or value < 0.0 for value in weights)
-        ):
-            raise ValueError(
-                "operator_consistency weights must be non-negative with zero CAR-teacher weight"
-            )
+            raise ValueError("operator_consistency requires one consistency_view_weight per training view")
+        if weights[0] != 0.0 or any(not math.isfinite(value) or value < 0.0 for value in weights):
+            raise ValueError("operator_consistency weights must be non-negative with zero CAR-teacher weight")
         if not any(value > 0.0 for value in weights[1:]):
-            raise ValueError(
-                "operator_consistency requires at least one positive student-view weight"
-            )
+            raise ValueError("operator_consistency requires at least one positive student-view weight")
         if consistency_weight <= 0.0:
             raise ValueError("operator_consistency requires a positive consistency_weight")
     if experiment.get("validation_predictions_only", False):
         if not experiment.get("save_validation_predictions", False):
-            raise ValueError(
-                "validation_predictions_only requires save_validation_predictions"
-            )
+            raise ValueError("validation_predictions_only requires save_validation_predictions")
         if len(experiment.get("defenses", ["none"])) != 1:
-            raise ValueError(
-                "validation_predictions_only requires exactly one defense"
-            )
+            raise ValueError("validation_predictions_only requires exactly one defense")
 
 
 def with_overrides(
@@ -139,6 +141,7 @@ def with_overrides(
     test_views: list[str] | None = None,
     defenses: list[str] | None = None,
     set_queries: int | None = None,
+    probe_auxiliary: str | None = None,
 ) -> dict[str, Any]:
     result = deepcopy(config)
     experiment = result["experiment"]
@@ -166,6 +169,8 @@ def with_overrides(
         experiment["defenses"] = [str(defense) for defense in defenses]
     if set_queries is not None:
         experiment["set_queries"] = int(set_queries)
+    if probe_auxiliary is not None:
+        experiment["probe_auxiliary"] = str(probe_auxiliary)
     validate_config(result)
     return result
 

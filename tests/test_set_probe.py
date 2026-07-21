@@ -87,6 +87,42 @@ class ReveSetProbeTests(unittest.TestCase):
         self.assertGreaterEqual(result.validation_balanced_accuracy, 0.5)
         self.assertGreaterEqual(result.validation_consistency_loss, 0.0)
 
+    def test_auxiliary_branch_accepts_aligned_spectral_tokens(self):
+        from gaugeeeg.set_probe import fit_reve_set_probe
+
+        rng = np.random.default_rng(17)
+        labels = np.tile(np.arange(4), 12)
+        tokens = rng.normal(size=(48, 5, 8)).astype(np.float32)
+        auxiliary = rng.normal(size=(48, 6, 9)).astype(np.float32)
+        for trial, label in enumerate(labels):
+            auxiliary[trial, 0, label] += 4.0
+        result = fit_reve_set_probe(
+            tokens[:32],
+            labels[:32],
+            tokens[32:],
+            labels[32:],
+            initial_query=np.zeros(8, dtype=np.float32),
+            n_classes=4,
+            seed=17,
+            device="cpu",
+            n_queries=2,
+            n_heads=2,
+            ff_multiplier=1,
+            batch_size=8,
+            epochs=3,
+            learning_rate=0.02,
+            warmup_epochs=0,
+            patience=3,
+            train_auxiliary=auxiliary[:32],
+            val_auxiliary=auxiliary[32:],
+            auxiliary_queries=1,
+            auxiliary_hidden_dim=8,
+        )
+        probabilities = result.model.predict_proba((tokens[32:], auxiliary[32:]))
+        self.assertEqual(probabilities.shape, (16, 4))
+        self.assertGreater(result.auxiliary_parameters, 0)
+        self.assertGreater(result.trainable_parameters, result.auxiliary_parameters)
+
 
 if __name__ == "__main__":
     unittest.main()

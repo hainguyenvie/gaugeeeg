@@ -839,3 +839,24 @@ DEVICE=cuda make channel-adaptation
 
 See [docs/PHASE_B_CHANNEL_ADAPTATION.md](docs/PHASE_B_CHANNEL_ADAPTATION.md)
 for the exact matrix, primary-metric bootstrap, and external-confirmation lock.
+
+## Gauge-Quotient Bilateral Adapter screen
+
+Phase B did not establish spherical-spline interpolation as an improvement
+over the native flexible-channel baseline. The first custom representation
+screen therefore keeps frozen REVE and the locked joint multi-view CE training,
+then adds a matched-capacity bilateral spectral branch. Its odd and even
+spatial contrasts are exactly invariant to a common EEG reference while
+separately preserving lateralized and bilateral motor activity:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+DEVICE=cuda make gqba-screen
+```
+
+The runner evaluates a raw spectral capacity control, odd-only ablation, and
+the complete odd+even GQBA over seeds 7/21/42. See
+[docs/GQBA_SCREEN.md](docs/GQBA_SCREEN.md) for the fixed representation,
+matched-parameter checks, advancement gates, and result files to return.

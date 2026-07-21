@@ -30,6 +30,7 @@ def _run_command(args: argparse.Namespace) -> None:
         test_views=args.test_views,
         defenses=args.defenses,
         set_queries=args.set_queries,
+        probe_auxiliary=args.probe_auxiliary,
     )
     run_experiment(config)
 
@@ -465,6 +466,20 @@ def _channel_adaptation_benchmark_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _gqba_benchmark_command(args: argparse.Namespace) -> None:
+    from .gqba_benchmark import analyze_gqba_benchmark
+
+    result = analyze_gqba_benchmark(
+        args.runs,
+        args.output_dir,
+        expected_seeds=args.expected_seeds,
+        bootstrap_resamples=args.bootstrap_resamples,
+        bootstrap_confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -491,6 +506,16 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--test-views", nargs="+", help="Override evaluation observation views")
     run.add_argument("--defenses", nargs="+", help="Override preprocessing defenses")
     run.add_argument("--set-queries", type=int, help="Override learned queries for probe: reve_set")
+    run.add_argument(
+        "--probe-auxiliary",
+        choices=[
+            "none",
+            "spectral_capacity_control",
+            "gqba_odd",
+            "gqba_odd_even",
+        ],
+        help="Optional matched-capacity bilateral spectral branch",
+    )
     run.set_defaults(handler=_run_command)
 
     download = subparsers.add_parser("download", help="Download and cache the configured dataset")
@@ -937,6 +962,18 @@ def build_parser() -> argparse.ArgumentParser:
     channel_adaptation.add_argument("--bootstrap-confidence", type=float, default=0.95)
     channel_adaptation.add_argument("--bootstrap-seed", type=int, default=20260721)
     channel_adaptation.set_defaults(handler=_channel_adaptation_benchmark_command)
+
+    gqba = subparsers.add_parser(
+        "gqba-audit",
+        help="Validate the matched-capacity GQBA development screen",
+    )
+    gqba.add_argument("--runs", nargs="+", required=True, metavar="METHOD=PATH")
+    gqba.add_argument("--output-dir", default="outputs/reve_gqba_screen/aggregate")
+    gqba.add_argument("--expected-seeds", nargs="+", type=int, default=[7, 21, 42])
+    gqba.add_argument("--bootstrap-resamples", type=int, default=10000)
+    gqba.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    gqba.add_argument("--bootstrap-seed", type=int, default=20260722)
+    gqba.set_defaults(handler=_gqba_benchmark_command)
     return parser
 
 

@@ -8,10 +8,14 @@ from copy import deepcopy
 import numpy as np
 from numpy.typing import NDArray
 
-from .torch_probe import TorchProbeResult, TorchTokenPredictor, configure_torch_determinism
-
+from .torch_probe import (
+    TorchProbeResult,
+    TorchTokenPredictor,
+    configure_torch_determinism,
+)
 
 FeatureViews = NDArray[np.floating] | Sequence[NDArray[np.floating]]
+AuxiliaryViews = NDArray[np.floating] | Sequence[NDArray[np.floating]]
 
 
 def _as_feature_views(features: FeatureViews, *, name: str) -> tuple[np.ndarray, ...]:
@@ -40,6 +44,67 @@ def _as_feature_views(features: FeatureViews, *, name: str) -> tuple[np.ndarray,
     return views
 
 
+def _as_auxiliary_views(
+    features: AuxiliaryViews,
+    *,
+    name: str,
+) -> tuple[np.ndarray, ...]:
+    """Normalize dense or multi-view GQBA token arrays."""
+
+    if isinstance(features, np.ndarray):
+        if features.ndim == 3:
+            views = (features,)
+        elif features.ndim == 4:
+            views = tuple(features[:, index] for index in range(features.shape[1]))
+        else:
+            raise ValueError(
+                f"{name} auxiliary features have invalid shape {features.shape}; "
+                "expected 3-D, 4-D, or a sequence of 3-D arrays"
+            )
+    else:
+        views = tuple(np.asarray(view) for view in features)
+    if not views or any(view.ndim != 3 for view in views):
+        raise ValueError(f"{name} must contain at least one 3-D auxiliary token array")
+    if len({int(view.shape[0]) for view in views}) != 1:
+        raise ValueError(f"{name} auxiliary views must contain aligned trial counts")
+    if len({tuple(view.shape[1:]) for view in views}) != 1:
+        raise ValueError(f"{name} auxiliary views must share token and feature dimensions")
+    if any(not np.isfinite(view).all() for view in views):
+        raise ValueError(f"{name} auxiliary features must be finite")
+    return views
+
+
+class TorchSetPredictor(TorchTokenPredictor):
+    """Prediction adapter accepting REVE tokens or ``(REVE, auxiliary)``."""
+
+    def _logits(self, x) -> NDArray[np.float32]:
+        import torch
+
+        if isinstance(x, tuple):
+            if len(x) != 2:
+                raise ValueError("Dual-input prediction expects (REVE tokens, auxiliary tokens)")
+            tokens, auxiliary = (np.asarray(value) for value in x)
+            if tokens.shape[0] != auxiliary.shape[0]:
+                raise ValueError("REVE and auxiliary prediction trials are not aligned")
+        else:
+            tokens = np.asarray(x)
+            auxiliary = None
+        self.module.eval()
+        chunks = []
+        with torch.inference_mode():
+            for start in range(0, tokens.shape[0], self.batch_size):
+                token_batch = torch.from_numpy(tokens[start : start + self.batch_size]).to(
+                    self.device, dtype=torch.float32
+                )
+                auxiliary_batch = None
+                if auxiliary is not None:
+                    auxiliary_batch = torch.from_numpy(auxiliary[start : start + self.batch_size]).to(
+                        self.device, dtype=torch.float32
+                    )
+                chunks.append(self.module(token_batch, auxiliary_batch).float().cpu().numpy())
+        return np.concatenate(chunks, axis=0).astype(np.float32, copy=False)
+
+
 def fit_reve_set_probe(
     train_x: FeatureViews,
     train_y: NDArray[np.integer],
@@ -65,6 +130,10 @@ def fit_reve_set_probe(
     objective: str = "car_only",
     consistency_weight: float = 0.0,
     consistency_view_weights: Sequence[float] | None = None,
+    train_auxiliary: AuxiliaryViews | None = None,
+    val_auxiliary: AuxiliaryViews | None = None,
+    auxiliary_queries: int = 2,
+    auxiliary_hidden_dim: int = 64,
 ) -> TorchProbeResult:
     """Fit a pooling-by-multihead-attention probe on a variable token set.
 
@@ -92,6 +161,23 @@ def fit_reve_set_probe(
         raise ValueError("Validation token trials and labels are not aligned")
     if train_views[0].shape[-1] != val_views[0].shape[-1]:
         raise ValueError("Train and validation REVE embedding dimensions differ")
+    use_auxiliary = train_auxiliary is not None or val_auxiliary is not None
+    if use_auxiliary and (train_auxiliary is None or val_auxiliary is None):
+        raise ValueError("Provide both train_auxiliary and val_auxiliary")
+    if use_auxiliary:
+        train_aux_views = _as_auxiliary_views(train_auxiliary, name="train")
+        val_aux_views = _as_auxiliary_views(val_auxiliary, name="validation")
+        if len(train_aux_views) != len(train_views) or len(val_aux_views) != len(val_views):
+            raise ValueError("Provide one aligned auxiliary array per REVE observation view")
+        if train_aux_views[0].shape[0] != train_views[0].shape[0]:
+            raise ValueError("Training REVE and auxiliary trial counts differ")
+        if val_aux_views[0].shape[0] != val_views[0].shape[0]:
+            raise ValueError("Validation REVE and auxiliary trial counts differ")
+        if train_aux_views[0].shape[1:] != val_aux_views[0].shape[1:]:
+            raise ValueError("Train and validation auxiliary token shapes differ")
+    else:
+        train_aux_views = ()
+        val_aux_views = ()
     objective = objective.casefold()
     allowed_objectives = {
         "car_only",
@@ -100,9 +186,7 @@ def fit_reve_set_probe(
         "operator_consistency",
     }
     if objective not in allowed_objectives:
-        raise ValueError(
-            f"Unknown set-probe objective {objective!r}; expected {sorted(allowed_objectives)}"
-        )
+        raise ValueError(f"Unknown set-probe objective {objective!r}; expected {sorted(allowed_objectives)}")
     if objective != "car_only" and len(train_views) < 2:
         raise ValueError(f"{objective} requires at least two aligned observation views")
     if consistency_weight < 0.0:
@@ -113,9 +197,7 @@ def fit_reve_set_probe(
         # irrelevant to it. Derive matching per-view weights from train_views
         # instead of failing the length check when the config carries weights
         # sized for the multi-montage arms.
-        view_weights = np.asarray(
-            [0.0, *([1.0] * (len(train_views) - 1))], dtype=np.float64
-        )
+        view_weights = np.asarray([0.0, *([1.0] * (len(train_views) - 1))], dtype=np.float64)
     else:
         view_weights = np.asarray(consistency_view_weights, dtype=np.float64)
     if view_weights.shape != (len(train_views),):
@@ -124,13 +206,11 @@ def fit_reve_set_probe(
         raise ValueError("Observation-view consistency weights must be finite and non-negative")
     if objective == "operator_consistency":
         if view_weights[0] != 0.0 or not np.any(view_weights[1:] > 0.0):
-            raise ValueError(
-                "Operator consistency needs zero teacher weight and a positive student weight"
-            )
+            raise ValueError("Operator consistency needs zero teacher weight and a positive student weight")
         if consistency_weight <= 0.0:
             raise ValueError("Operator consistency requires a positive consistency_weight")
-    if n_queries < 1 or n_heads < 1 or ff_multiplier < 1:
-        raise ValueError("n_queries, n_heads, and ff_multiplier must be positive")
+    if n_queries < 1 or n_heads < 1 or ff_multiplier < 1 or auxiliary_queries < 1 or auxiliary_hidden_dim < 1:
+        raise ValueError("Probe query, head, feed-forward, and auxiliary sizes must be positive")
     embed_dim = int(train_views[0].shape[-1])
     if embed_dim % n_heads:
         raise ValueError(f"embedding dimension {embed_dim} must be divisible by n_heads={n_heads}")
@@ -168,14 +248,76 @@ def fit_reve_set_probe(
             self.dropout = nn.Dropout(dropout)
             self.linear = nn.Linear(n_queries * embed_dim, n_classes)
 
-        def forward(self, tokens):
+            self.uses_auxiliary = use_auxiliary
+            if use_auxiliary:
+                auxiliary_dim = int(train_aux_views[0].shape[-1])
+                self.register_buffer(
+                    "auxiliary_mean",
+                    torch.as_tensor(
+                        np.concatenate(train_aux_views, axis=0).mean(axis=(0, 1)),
+                        dtype=torch.float32,
+                    ).reshape(1, 1, auxiliary_dim),
+                )
+                auxiliary_scale = np.concatenate(train_aux_views, axis=0).std(axis=(0, 1))
+                auxiliary_scale[auxiliary_scale < 1e-6] = 1.0
+                self.register_buffer(
+                    "auxiliary_scale",
+                    torch.as_tensor(auxiliary_scale, dtype=torch.float32).reshape(1, 1, auxiliary_dim),
+                )
+                self.auxiliary_encoder = nn.Sequential(
+                    nn.Linear(auxiliary_dim, auxiliary_hidden_dim),
+                    nn.GELU(),
+                    nn.LayerNorm(auxiliary_hidden_dim),
+                    nn.Linear(auxiliary_hidden_dim, embed_dim),
+                )
+                auxiliary_generator = torch.Generator().manual_seed(seed + 130363)
+                self.auxiliary_queries = nn.Parameter(
+                    torch.randn(
+                        auxiliary_queries,
+                        embed_dim,
+                        generator=auxiliary_generator,
+                    )
+                    * 0.02
+                )
+                self.auxiliary_attention = nn.MultiheadAttention(
+                    embed_dim,
+                    n_heads,
+                    dropout=dropout,
+                    batch_first=True,
+                )
+                self.auxiliary_norm = nn.LayerNorm(embed_dim)
+                self.auxiliary_linear = nn.Linear(auxiliary_queries * embed_dim, n_classes)
+                # The first forward pass is exactly the existing REVE head.
+                # The residual branch receives gradients through this layer,
+                # then learns only when the data support an auxiliary update.
+                nn.init.zeros_(self.auxiliary_linear.weight)
+                nn.init.zeros_(self.auxiliary_linear.bias)
+
+        def forward(self, tokens, auxiliary=None):
             queries = self.queries.unsqueeze(0).expand(tokens.shape[0], -1, -1)
             # Request explicit weights to avoid fused SDPA kernels whose exact
             # deterministic behavior varies across PyTorch/CUDA releases.
             context, _ = self.attention(queries, tokens, tokens, need_weights=True)
             context = self.attention_norm(queries + context)
             context = self.output_norm(context + self.feed_forward(context))
-            return self.linear(self.dropout(context.flatten(1)))
+            logits = self.linear(self.dropout(context.flatten(1)))
+            if not self.uses_auxiliary:
+                if auxiliary is not None:
+                    raise ValueError("This REVE set head was fitted without auxiliary tokens")
+                return logits
+            if auxiliary is None:
+                raise ValueError("This REVE set head requires auxiliary tokens")
+            normalized = (auxiliary - self.auxiliary_mean) / self.auxiliary_scale
+            auxiliary_tokens = self.auxiliary_encoder(normalized)
+            auxiliary_queries_batch = self.auxiliary_queries.unsqueeze(0).expand(tokens.shape[0], -1, -1)
+            auxiliary_context, _ = self.auxiliary_attention(
+                auxiliary_queries_batch,
+                auxiliary_tokens,
+                auxiliary_tokens,
+                need_weights=True,
+            )
+            auxiliary_context = self.auxiliary_norm(auxiliary_queries_batch + auxiliary_context)
+            return logits + self.auxiliary_linear(self.dropout(auxiliary_context.flatten(1)))
 
     model = ReveSetHead().to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
@@ -184,9 +326,8 @@ def fit_reve_set_probe(
     )
     criterion = nn.CrossEntropyLoss()
     generator = torch.Generator().manual_seed(seed)
-    train_view_tensors = [
-        torch.from_numpy(np.asarray(view)) for view in train_views
-    ]
+    train_view_tensors = [torch.from_numpy(np.asarray(view)) for view in train_views]
+    train_auxiliary_tensors = [torch.from_numpy(np.asarray(view)) for view in train_aux_views]
     train_loader = DataLoader(
         TensorDataset(
             torch.arange(train_views[0].shape[0], dtype=torch.long),
@@ -197,7 +338,7 @@ def fit_reve_set_probe(
         generator=generator,
         pin_memory=str(device).startswith("cuda"),
     )
-    predictor = TorchTokenPredictor(model, device=device, batch_size=batch_size)
+    predictor = TorchSetPredictor(model, device=device, batch_size=batch_size)
     total_warmup_steps = warmup_epochs * len(train_loader)
     global_step = 0
     best_score = -1.0
@@ -223,11 +364,14 @@ def fit_reve_set_probe(
             logits = torch.stack(
                 [
                     model(
-                        tokens[indices].to(
+                        tokens[indices].to(device, dtype=torch.float32, non_blocking=True),
+                        None
+                        if not use_auxiliary
+                        else train_auxiliary_tensors[view_index][indices].to(
                             device, dtype=torch.float32, non_blocking=True
-                        )
+                        ),
                     )
-                    for tokens in train_view_tensors
+                    for view_index, tokens in enumerate(train_view_tensors)
                 ],
                 dim=1,
             )
@@ -235,46 +379,33 @@ def fit_reve_set_probe(
                 ce_loss = criterion(logits[:, 0], labels)
             else:
                 repeated_labels = labels[:, None].expand(-1, logits.shape[1])
-                ce_loss = criterion(
-                    logits.flatten(0, 1), repeated_labels.reshape(-1)
-                )
+                ce_loss = criterion(logits.flatten(0, 1), repeated_labels.reshape(-1))
 
             consistency_loss = logits.new_zeros(())
             if objective == "rule_consistency":
                 log_probability = torch.log_softmax(logits, dim=-1)
                 probability = log_probability.exp()
-                mean_probability = probability.mean(dim=1, keepdim=True).clamp_min(
-                    1e-8
-                )
+                mean_probability = probability.mean(dim=1, keepdim=True).clamp_min(1e-8)
                 consistency_loss = (
-                    probability * (log_probability - mean_probability.log())
-                ).sum(dim=-1).mean()
-            elif objective == "operator_consistency":
-                teacher_log_probability = torch.log_softmax(
-                    logits[:, 0].detach(), dim=-1
+                    (probability * (log_probability - mean_probability.log())).sum(dim=-1).mean()
                 )
+            elif objective == "operator_consistency":
+                teacher_log_probability = torch.log_softmax(logits[:, 0].detach(), dim=-1)
                 teacher_probability = teacher_log_probability.exp()
                 weighted_terms = []
                 active_weights = []
                 for view_index, view_weight in enumerate(view_weights[1:], start=1):
                     if view_weight <= 0.0:
                         continue
-                    student_log_probability = torch.log_softmax(
-                        logits[:, view_index], dim=-1
-                    )
+                    student_log_probability = torch.log_softmax(logits[:, view_index], dim=-1)
                     weighted_terms.append(
                         float(view_weight)
-                        * (
-                            teacher_probability
-                            * (teacher_log_probability - student_log_probability)
-                        )
+                        * (teacher_probability * (teacher_log_probability - student_log_probability))
                         .sum(dim=-1)
                         .mean()
                     )
                     active_weights.append(float(view_weight))
-                consistency_loss = torch.stack(weighted_terms).sum() / sum(
-                    active_weights
-                )
+                consistency_loss = torch.stack(weighted_terms).sum() / sum(active_weights)
             loss = ce_loss + consistency_weight * consistency_loss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=clip_grad)
@@ -285,15 +416,15 @@ def fit_reve_set_probe(
             global_step += 1
 
         validation_probabilities = np.stack(
-            [predictor.predict_proba(view) for view in val_views], axis=1
+            [
+                predictor.predict_proba(view if not use_auxiliary else (view, val_aux_views[view_index]))
+                for view_index, view in enumerate(val_views)
+            ],
+            axis=1,
         )
         validation_predictions = validation_probabilities.argmax(axis=-1)
         validation_scores = [
-            float(
-                balanced_accuracy_score(
-                    val_y, validation_predictions[:, view_index]
-                )
-            )
+            float(balanced_accuracy_score(val_y, validation_predictions[:, view_index]))
             for view_index in range(len(val_views))
         ]
         clipped_probability = np.clip(validation_probabilities, 1e-8, 1.0)
@@ -304,34 +435,20 @@ def fit_reve_set_probe(
                 float(view_weight)
                 * np.mean(
                     np.sum(
-                        teacher
-                        * (
-                            teacher_log
-                            - np.log(clipped_probability[:, view_index])
-                        ),
+                        teacher * (teacher_log - np.log(clipped_probability[:, view_index])),
                         axis=-1,
                     )
                 )
-                for view_index, view_weight in enumerate(
-                    view_weights[1:], start=1
-                )
+                for view_index, view_weight in enumerate(view_weights[1:], start=1)
                 if view_weight > 0.0
             ]
-            validation_consistency = float(
-                np.sum(validation_terms) / np.sum(view_weights[1:])
-            )
+            validation_consistency = float(np.sum(validation_terms) / np.sum(view_weights[1:]))
         elif len(val_views) > 1:
-            mean_probability = np.clip(
-                clipped_probability.mean(axis=1, keepdims=True), 1e-8, 1.0
-            )
+            mean_probability = np.clip(clipped_probability.mean(axis=1, keepdims=True), 1e-8, 1.0)
             validation_consistency = float(
                 np.mean(
                     np.sum(
-                        clipped_probability
-                        * (
-                            np.log(clipped_probability)
-                            - np.log(mean_probability)
-                        ),
+                        clipped_probability * (np.log(clipped_probability) - np.log(mean_probability)),
                         axis=-1,
                     )
                 )
@@ -356,9 +473,7 @@ def fit_reve_set_probe(
                 "epoch": float(epoch),
                 "train_loss": float(epoch_loss),
                 "train_ce_loss": float(epoch_ce / train_y.size),
-                "train_consistency_loss": float(
-                    epoch_consistency / train_y.size
-                ),
+                "train_consistency_loss": float(epoch_consistency / train_y.size),
                 "validation_car_balanced_accuracy": clean_score,
                 "validation_balanced_accuracy": score,
                 "validation_consistency_loss": validation_consistency,
@@ -387,6 +502,16 @@ def fit_reve_set_probe(
     if best_state is None:
         raise RuntimeError("REVE set probe did not produce a checkpoint")
     model.load_state_dict(best_state)
+    trainable_parameters = sum(
+        parameter.numel() for parameter in model.parameters() if parameter.requires_grad
+    )
+    auxiliary_parameters = 0
+    if use_auxiliary:
+        auxiliary_parameters = sum(
+            parameter.numel()
+            for name, parameter in model.named_parameters()
+            if name.startswith("auxiliary_") and parameter.requires_grad
+        )
     return TorchProbeResult(
         predictor,
         best_epoch,
@@ -394,4 +519,6 @@ def fit_reve_set_probe(
         best_consistency,
         best_disagreement,
         tuple(history),
+        trainable_parameters,
+        auxiliary_parameters,
     )

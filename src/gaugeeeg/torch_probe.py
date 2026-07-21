@@ -17,6 +17,8 @@ class TorchProbeResult:
     validation_consistency_loss: float
     validation_prediction_disagreement: float
     history: tuple[dict[str, float], ...]
+    trainable_parameters: int = 0
+    auxiliary_parameters: int = 0
 
 
 class TorchTokenPredictor:
@@ -213,8 +215,8 @@ def fit_reve_token_probe(
                 probabilities = log_probabilities.exp()
                 mean_probability = probabilities.mean(dim=1, keepdim=True).clamp_min(1e-8)
                 consistency_loss = (
-                    probabilities * (log_probabilities - mean_probability.log())
-                ).sum(dim=-1).mean()
+                    (probabilities * (log_probabilities - mean_probability.log())).sum(dim=-1).mean()
+                )
             loss = ce_loss + consistency_weight * consistency_loss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=clip_grad)
@@ -238,8 +240,7 @@ def fit_reve_token_probe(
         validation_consistency = float(
             np.mean(
                 np.sum(
-                    clipped_probability
-                    * (np.log(clipped_probability) - np.log(mean_probability)),
+                    clipped_probability * (np.log(clipped_probability) - np.log(mean_probability)),
                     axis=-1,
                 )
             )

@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .bilateral import bilateral_spectral_tokens, gqba_metadata
 from .channel_adaptation import adapt_observation_channels, channel_adaptation_metadata
 from .config import dump_config
 from .datasets import EEGDataset, dataset_fingerprint, load_physionet_mi
@@ -96,6 +97,55 @@ def _extract_features(
     return features, subset.y
 
 
+def _extract_auxiliary_features(
+    dataset: EEGDataset,
+    *,
+    dataset_signature: str,
+    split_name: str,
+    subject_ids: list[int],
+    view: str,
+    mode: str,
+    seed: int,
+    cache_dir: Path,
+    force_recompute: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build/cache raw-signal spectral tokens for the GQBA probe branch."""
+
+    subset = dataset.subset(subject_ids)
+    payload = json.dumps(
+        {
+            "feature_pipeline": "gqba-bilateral-spectral:v1",
+            "dataset": dataset_signature,
+            "split": split_name,
+            "subjects": subject_ids,
+            "view": view,
+            "mode": mode,
+            "seed": seed,
+        },
+        sort_keys=True,
+    ).encode()
+    cache_key = hashlib.sha256(payload).hexdigest()[:16]
+    cache_path = cache_dir / f"gqba_{cache_key}.npz"
+    if cache_path.exists() and not force_recompute:
+        with np.load(cache_path, allow_pickle=False) as cached:
+            return cached["features"], cached["labels"]
+    referenced, observed_channel_names = prepare_observation_view(
+        subset.x_uv,
+        subset.channel_names,
+        view,
+        seed=seed,
+    )
+    features = bilateral_spectral_tokens(
+        referenced,
+        observed_channel_names,
+        subset.sfreq,
+        mode=mode,
+    )
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(cache_path, features=features, labels=subset.y)
+    return features, subset.y
+
+
 def _validate_labels(name: str, y: np.ndarray, expected_classes: int) -> None:
     present = np.unique(y)
     expected = np.arange(expected_classes)
@@ -114,7 +164,7 @@ def _drift_features(encoder: Encoder, features: np.ndarray) -> np.ndarray:
 
 def _predict_outputs(
     predictor,
-    features: np.ndarray,
+    features,
 ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
     """Predict once while retaining raw logits when the probe exposes them."""
 
@@ -225,6 +275,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     if not training_views or training_views[0].casefold() != "car":
         raise ValueError("training_views must be non-empty with CAR as view zero")
     probe_objective = str(experiment.get("probe_objective", "car_only")).casefold()
+    probe_auxiliary = str(experiment.get("probe_auxiliary", "none")).casefold()
+    use_probe_auxiliary = probe_auxiliary != "none"
     consistency_weight = float(experiment.get("consistency_weight", 0.0))
     views = [str(view) for view in experiment.get("test_views", ["car"])]
     validation_prediction_views = [str(view) for view in experiment.get("validation_prediction_views", views)]
@@ -246,8 +298,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         print(f"\n=== Encoder={encoder.name} | defense={defense} ===")
         train_features: list[np.ndarray] = []
         val_features: list[np.ndarray] = []
+        train_auxiliary_features: list[np.ndarray] = []
+        val_auxiliary_features: list[np.ndarray] = []
         train_y: np.ndarray | None = None
         val_y: np.ndarray | None = None
+        auxiliary_reference_max_abs_diff = float("nan")
         for training_view in training_views:
             current_train_x, current_train_y = _extract_features(
                 dataset,
@@ -280,6 +335,53 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 raise RuntimeError("Train/validation label order changed across reference views")
             train_features.append(current_train_x)
             val_features.append(current_val_x)
+            if use_probe_auxiliary:
+                current_train_aux, auxiliary_train_y = _extract_auxiliary_features(
+                    dataset,
+                    dataset_signature=data_signature,
+                    split_name="train",
+                    subject_ids=splits["train"],
+                    view=training_view,
+                    mode=probe_auxiliary,
+                    seed=reference_seed,
+                    cache_dir=feature_cache,
+                    force_recompute=force_recompute,
+                )
+                current_val_aux, auxiliary_val_y = _extract_auxiliary_features(
+                    dataset,
+                    dataset_signature=data_signature,
+                    split_name="val",
+                    subject_ids=splits["val"],
+                    view=training_view,
+                    mode=probe_auxiliary,
+                    seed=reference_seed,
+                    cache_dir=feature_cache,
+                    force_recompute=force_recompute,
+                )
+                if not np.array_equal(train_y, auxiliary_train_y) or not np.array_equal(
+                    val_y, auxiliary_val_y
+                ):
+                    raise RuntimeError("GQBA auxiliary labels are not aligned with REVE features")
+                train_auxiliary_features.append(current_train_aux)
+                val_auxiliary_features.append(current_val_aux)
+
+        if probe_auxiliary in {"gqba_odd", "gqba_odd_even"}:
+            reference_train = train_auxiliary_features[0]
+            reference_val = val_auxiliary_features[0]
+            differences = [
+                float(np.max(np.abs(features - reference_train))) for features in train_auxiliary_features[1:]
+            ] + [float(np.max(np.abs(features - reference_val))) for features in val_auxiliary_features[1:]]
+            auxiliary_reference_max_abs_diff = max(differences, default=0.0)
+            if any(
+                not np.allclose(features, reference_train, rtol=1e-4, atol=1e-4)
+                for features in train_auxiliary_features[1:]
+            ) or any(
+                not np.allclose(features, reference_val, rtol=1e-4, atol=1e-4)
+                for features in val_auxiliary_features[1:]
+            ):
+                raise RuntimeError(
+                    "Gauge-invariant auxiliary tokens changed across the locked reference/montage views"
+                )
 
         if train_y is None or val_y is None:
             raise RuntimeError("No training features were extracted")
@@ -302,6 +404,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         selected_epoch = 0
         validation_consistency_loss = float("nan")
         validation_prediction_disagreement = float("nan")
+        trainable_parameters = 0
+        auxiliary_parameters = 0
         if probe_name == "sklearn_logreg":
             if len(training_views) != 1:
                 raise ValueError("sklearn_logreg does not support aligned multi-view training")
@@ -351,6 +455,20 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                     **common_probe_kwargs,
                 )
             else:
+                if use_probe_auxiliary:
+                    train_auxiliary = (
+                        train_auxiliary_features[0]
+                        if len(train_auxiliary_features) == 1
+                        else tuple(train_auxiliary_features)
+                    )
+                    val_auxiliary = (
+                        val_auxiliary_features[0]
+                        if len(val_auxiliary_features) == 1
+                        else tuple(val_auxiliary_features)
+                    )
+                else:
+                    train_auxiliary = None
+                    val_auxiliary = None
                 probe = fit_reve_set_probe(
                     train_x,
                     train_y,
@@ -362,6 +480,10 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                     objective=probe_objective,
                     consistency_weight=consistency_weight,
                     consistency_view_weights=experiment.get("consistency_view_weights"),
+                    train_auxiliary=train_auxiliary,
+                    val_auxiliary=val_auxiliary,
+                    auxiliary_queries=int(experiment.get("auxiliary_queries", 2)),
+                    auxiliary_hidden_dim=int(experiment.get("auxiliary_hidden_dim", 64)),
                     **common_probe_kwargs,
                 )
             predictor = probe.model
@@ -369,6 +491,8 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             validation_score = probe.validation_balanced_accuracy
             validation_consistency_loss = probe.validation_consistency_loss
             validation_prediction_disagreement = probe.validation_prediction_disagreement
+            trainable_parameters = probe.trainable_parameters
+            auxiliary_parameters = probe.auxiliary_parameters
             pd.DataFrame(probe.history).to_csv(output_dir / f"probe_history_{defense}.csv", index=False)
 
             if bool(experiment.get("save_probe_checkpoint", True)):
@@ -392,6 +516,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                             "consistency_view_weights": experiment.get("consistency_view_weights"),
                             "set_queries": int(experiment.get("set_queries", 0)),
                             "set_heads": int(experiment.get("set_heads", 0)),
+                            "probe_auxiliary": probe_auxiliary,
+                            "auxiliary_queries": int(experiment.get("auxiliary_queries", 2)),
+                            "auxiliary_hidden_dim": int(experiment.get("auxiliary_hidden_dim", 64)),
                         },
                         output_dir / f"probe_best_{defense}.pt",
                     )
@@ -418,8 +545,19 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 }
                 if not np.array_equal(prediction_labels, val_y):
                     raise RuntimeError("Validation prediction labels do not match probe validation")
+                validation_auxiliary_by_view = (
+                    {
+                        training_view.casefold(): features
+                        for training_view, features in zip(
+                            training_views, val_auxiliary_features, strict=True
+                        )
+                    }
+                    if use_probe_auxiliary
+                    else {}
+                )
             else:
                 validation_feature_by_view = {}
+                validation_auxiliary_by_view = {}
             for view in validation_prediction_views:
                 key = view.casefold()
                 if key not in validation_feature_by_view:
@@ -438,9 +576,30 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                     if not np.array_equal(prediction_labels, labels):
                         raise RuntimeError("Prediction label order changed across reference views")
                     validation_feature_by_view[key] = features
+                if use_probe_auxiliary and key not in validation_auxiliary_by_view:
+                    auxiliary, labels = _extract_auxiliary_features(
+                        dataset,
+                        dataset_signature=data_signature,
+                        split_name=prediction_cache_namespace,
+                        subject_ids=prediction_subject_ids,
+                        view=view,
+                        mode=probe_auxiliary,
+                        seed=reference_seed,
+                        cache_dir=feature_cache,
+                        force_recompute=force_recompute,
+                    )
+                    if not np.array_equal(prediction_labels, labels):
+                        raise RuntimeError("Prediction labels changed in the GQBA auxiliary cache")
+                    validation_auxiliary_by_view[key] = auxiliary
+                prediction_input = validation_feature_by_view[key]
+                if use_probe_auxiliary:
+                    prediction_input = (
+                        prediction_input,
+                        validation_auxiliary_by_view[key],
+                    )
                 prediction, probability, logits = _predict_outputs(
                     predictor,
-                    validation_feature_by_view[key],
+                    prediction_input,
                 )
                 validation_prediction_frames.append(
                     _prediction_frame(
@@ -474,6 +633,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             continue
 
         test_features: dict[str, np.ndarray] = {}
+        test_auxiliary_features: dict[str, np.ndarray] = {}
         test_labels: np.ndarray | None = None
         for view in views:
             features, labels = _extract_features(
@@ -494,6 +654,21 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             elif not np.array_equal(test_labels, labels):
                 raise RuntimeError("Test label order changed across reference views")
             test_features[view.casefold()] = features
+            if use_probe_auxiliary:
+                auxiliary, auxiliary_labels = _extract_auxiliary_features(
+                    dataset,
+                    dataset_signature=data_signature,
+                    split_name="test",
+                    subject_ids=splits["test"],
+                    view=view,
+                    mode=probe_auxiliary,
+                    seed=reference_seed,
+                    cache_dir=feature_cache,
+                    force_recompute=force_recompute,
+                )
+                if not np.array_equal(labels, auxiliary_labels):
+                    raise RuntimeError("Test GQBA auxiliary labels are not aligned")
+                test_auxiliary_features[view.casefold()] = auxiliary
 
         if "car" not in test_features or test_labels is None:
             raise RuntimeError("A CAR test view is required")
@@ -508,9 +683,12 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         task_metrics: dict[str, dict[str, float]] = {}
         for view in views:
             key = view.casefold()
+            prediction_input = test_features[key]
+            if use_probe_auxiliary:
+                prediction_input = (prediction_input, test_auxiliary_features[key])
             predictions[key], probabilities[key], logits_by_view[key] = _predict_outputs(
                 predictor,
-                test_features[key],
+                prediction_input,
             )
             task_metrics[key] = classification_metrics_from_predictions(
                 test_labels,
@@ -542,6 +720,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 "n_test": int(test_labels.size),
                 "probe": probe_name,
                 "probe_objective": probe_objective,
+                "probe_auxiliary": probe_auxiliary,
+                "trainable_parameters": trainable_parameters,
+                "auxiliary_parameters": auxiliary_parameters,
                 "consistency_weight": consistency_weight,
                 "set_queries": int(experiment.get("set_queries", 0)),
                 "set_heads": int(experiment.get("set_heads", 0)),
@@ -643,8 +824,15 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             "strict_determinism": strict_determinism,
             "probe": probe_name,
             "probe_objective": probe_objective,
+            "probe_auxiliary": probe_auxiliary,
+            "probe_auxiliary_metadata": gqba_metadata(probe_auxiliary),
             "set_queries": int(experiment.get("set_queries", 0)),
             "set_heads": int(experiment.get("set_heads", 0)),
+            "auxiliary_queries": int(experiment.get("auxiliary_queries", 2)),
+            "auxiliary_hidden_dim": int(experiment.get("auxiliary_hidden_dim", 64)),
+            "trainable_parameters": trainable_parameters,
+            "auxiliary_parameters": auxiliary_parameters,
+            "auxiliary_reference_max_abs_diff": auxiliary_reference_max_abs_diff,
             "training_views": training_views,
             "defenses": defenses,
             "defense_metadata": {defense: channel_adaptation_metadata(defense) for defense in defenses},
@@ -724,6 +912,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "reference_seed": reference_seed,
         "strict_determinism": strict_determinism,
         "probe_objective": probe_objective,
+        "probe_auxiliary": probe_auxiliary,
+        "probe_auxiliary_metadata": gqba_metadata(probe_auxiliary),
+        "trainable_parameters": trainable_parameters,
+        "auxiliary_parameters": auxiliary_parameters,
+        "auxiliary_reference_max_abs_diff": auxiliary_reference_max_abs_diff,
         "training_views": training_views,
         "defenses": defenses,
         "defense_metadata": {defense: channel_adaptation_metadata(defense) for defense in defenses},
