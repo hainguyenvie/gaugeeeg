@@ -1,0 +1,23 @@
+{
+  "stage": "GaugeEEG GQBA matched-capacity development screen",
+  "status": "development_method_screen_only",
+  "primary_metric": "mean BAcc over native16@{CAR,Cz,Pz,Fz}",
+  "proposed_method": "gqba_odd_even",
+  "strong_baseline": "joint_multiview_ce",
+  "capacity_control": "spectral_capacity_control",
+  "physionetmi_is_globally_untouched_test": false,
+  "external_dataset_required_for_confirmation": true,
+  "parameter_count_match": [
+    3203848,
+    1090820
+  ],
+  "gates": {
+    "primary_ci_above_zero_vs_joint": false,
+    "beats_matched_capacity_control": false,
+    "clean_car_noninferior_to_car_only": true,
+    "both_fists_recall_gain_at_least_0p03": true,
+    "worst_class_recall_preserved": true
+  },
+  "hypothesis_supported": false,
+  "interpretation_if_failed": "Retain joint_multiview_ce; do not claim GQBA or tune its rule on the audit subjects."
+}

@@ -1,0 +1,16 @@
+method,run_dir,probe_seed,probe_auxiliary,trainable_parameters,auxiliary_parameters
+car_only,outputs/reve_benchmark_lock/car_only_s7,7,none,0,0
+car_only,outputs/reve_benchmark_lock/car_only_s21,21,none,0,0
+car_only,outputs/reve_benchmark_lock/car_only_s42,42,none,0,0
+gqba_odd,outputs/reve_gqba_screen/gqba_odd_s7,7,gqba_odd,3203848,1090820
+gqba_odd,outputs/reve_gqba_screen/gqba_odd_s21,21,gqba_odd,3203848,1090820
+gqba_odd,outputs/reve_gqba_screen/gqba_odd_s42,42,gqba_odd,3203848,1090820
+gqba_odd_even,outputs/reve_gqba_screen/gqba_odd_even_s7,7,gqba_odd_even,3203848,1090820
+gqba_odd_even,outputs/reve_gqba_screen/gqba_odd_even_s21,21,gqba_odd_even,3203848,1090820
+gqba_odd_even,outputs/reve_gqba_screen/gqba_odd_even_s42,42,gqba_odd_even,3203848,1090820
+joint_multiview_ce,outputs/reve_benchmark_lock/joint_multiview_ce_s7,7,none,0,0
+joint_multiview_ce,outputs/reve_benchmark_lock/joint_multiview_ce_s21,21,none,0,0
+joint_multiview_ce,outputs/reve_benchmark_lock/joint_multiview_ce_s42,42,none,0,0
+spectral_capacity_control,outputs/reve_gqba_screen/spectral_capacity_control_s7,7,spectral_capacity_control,3203848,1090820
+spectral_capacity_control,outputs/reve_gqba_screen/spectral_capacity_control_s21,21,spectral_capacity_control,3203848,1090820
+spectral_capacity_control,outputs/reve_gqba_screen/spectral_capacity_control_s42,42,spectral_capacity_control,3203848,1090820
