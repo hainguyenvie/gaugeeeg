@@ -176,6 +176,55 @@ class ReveSetProbeTests(unittest.TestCase):
         self.assertIn("train_auxiliary_gate_supervision_loss", result.history[0])
         self.assertTrue(np.isfinite(result.validation_auxiliary_gate_supervision_loss))
 
+    def test_film_auxiliary_reports_representation_diagnostics(self):
+        from gaugeeeg.set_probe import fit_reve_set_probe
+
+        rng = np.random.default_rng(29)
+        labels = np.tile(np.arange(4), 16)
+        full = rng.normal(scale=0.2, size=(64, 6, 8)).astype(np.float32)
+        sparse = full[:, :4].copy()
+        auxiliary = rng.normal(scale=0.2, size=(64, 6, 9)).astype(np.float32)
+        for trial, label in enumerate(labels):
+            full[trial, 0, label] += 2.0
+            sparse[trial, 0, label] += 2.0
+            auxiliary[trial, 0, label] += 2.0
+        result = fit_reve_set_probe(
+            (full[:48], sparse[:48]),
+            labels[:48],
+            (full[48:], sparse[48:]),
+            labels[48:],
+            initial_query=np.zeros(8, dtype=np.float32),
+            n_classes=4,
+            seed=29,
+            device="cpu",
+            n_queries=2,
+            n_heads=2,
+            ff_multiplier=1,
+            batch_size=8,
+            epochs=3,
+            learning_rate=0.02,
+            warmup_epochs=0,
+            patience=3,
+            objective="multi_view_ce",
+            train_auxiliary=(auxiliary[:48], auxiliary[:48]),
+            val_auxiliary=(auxiliary[48:], auxiliary[48:]),
+            auxiliary_queries=1,
+            auxiliary_hidden_dim=8,
+            auxiliary_fusion="film",
+            auxiliary_target_classes=[2, 3],
+            representation_contrastive_weight=0.1,
+            representation_bilaterality_weight=0.2,
+            representation_temperature=0.1,
+        )
+        diagnostics = result.model.predict_representation_components((full[48:], auxiliary[48:]))
+        self.assertEqual(diagnostics["representation"].shape, (16, 8))
+        self.assertEqual(diagnostics["bilaterality_logits"].shape, (16, 2))
+        self.assertTrue(np.isfinite(result.validation_representation_alignment_loss))
+        self.assertTrue(np.isfinite(result.validation_representation_class_margin))
+        self.assertTrue(np.isfinite(result.validation_representation_bilaterality_balanced_accuracy))
+        self.assertIn("train_representation_contrastive_loss", result.history[0])
+        self.assertIn("train_representation_bilaterality_loss", result.history[0])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -45,6 +45,9 @@ experiment:
   auxiliary_residual_consistency_weight: 0.0
   auxiliary_gate_supervision_weight: 0.0
   auxiliary_target_classes: [2, 3]
+  representation_contrastive_weight: 0.0
+  representation_bilaterality_weight: 0.0
+  representation_temperature: 0.1
   probe_batch_size: 32
   probe_epochs: 20
   probe_learning_rate: 0.0001

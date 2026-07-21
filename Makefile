@@ -1,4 +1,4 @@
-.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control set-bias-manifold set-prior-stress set-prior-identifiability set-class-safeguard set-strong-baseline-audit set-probe-seed-confirmation set-operator-consistency benchmark-baselines channel-adaptation gqba-screen gsra-screen
+.PHONY: install test synthetic pilot consistency-multiseed consistency-lambda-ablation montage-screen native-montage-screen set-native-screen set-reference-closure set-reference-geometry set-calibration-control set-bias-manifold set-prior-stress set-prior-identifiability set-class-safeguard set-strong-baseline-audit set-probe-seed-confirmation set-operator-consistency benchmark-baselines channel-adaptation gqba-screen gsra-screen gqra-screen
 
 install:
 	python -m pip install -e ".[data,dev]"
@@ -68,3 +68,6 @@ gqba-screen:
 
 gsra-screen:
 	bash scripts/run_reve_gsra_screen.sh
+
+gqra-screen:
+	bash scripts/run_reve_gqra_screen.sh

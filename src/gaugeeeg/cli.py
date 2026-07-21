@@ -37,6 +37,9 @@ def _run_command(args: argparse.Namespace) -> None:
         auxiliary_residual_consistency_weight=args.auxiliary_residual_consistency_weight,
         auxiliary_gate_supervision_weight=args.auxiliary_gate_supervision_weight,
         auxiliary_target_classes=args.auxiliary_target_classes,
+        representation_contrastive_weight=args.representation_contrastive_weight,
+        representation_bilaterality_weight=args.representation_bilaterality_weight,
+        representation_temperature=args.representation_temperature,
     )
     run_experiment(config)
 
@@ -500,6 +503,20 @@ def _gsra_benchmark_command(args: argparse.Namespace) -> None:
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
+def _gqra_benchmark_command(args: argparse.Namespace) -> None:
+    from .gqra_benchmark import analyze_gqra_benchmark
+
+    result = analyze_gqra_benchmark(
+        args.runs,
+        args.output_dir,
+        expected_seeds=args.expected_seeds,
+        bootstrap_resamples=args.bootstrap_resamples,
+        bootstrap_confidence=args.bootstrap_confidence,
+        bootstrap_seed=args.bootstrap_seed,
+    )
+    print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gaugeeeg", description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -538,14 +555,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument(
         "--auxiliary-fusion",
-        choices=["residual", "gated_residual"],
-        help="Fuse auxiliary logits directly or through a learned confidence gate",
+        choices=["residual", "gated_residual", "film"],
+        help="Fuse auxiliary information at logits or condition the learned representation",
     )
     run.add_argument("--auxiliary-gate-initial-probability", type=float)
     run.add_argument("--auxiliary-preservation-weight", type=float)
     run.add_argument("--auxiliary-residual-consistency-weight", type=float)
     run.add_argument("--auxiliary-gate-supervision-weight", type=float)
     run.add_argument("--auxiliary-target-classes", nargs="+", type=int)
+    run.add_argument("--representation-contrastive-weight", type=float)
+    run.add_argument("--representation-bilaterality-weight", type=float)
+    run.add_argument("--representation-temperature", type=float)
     run.set_defaults(handler=_run_command)
 
     download = subparsers.add_parser("download", help="Download and cache the configured dataset")
@@ -1016,6 +1036,18 @@ def build_parser() -> argparse.ArgumentParser:
     gsra.add_argument("--bootstrap-confidence", type=float, default=0.95)
     gsra.add_argument("--bootstrap-seed", type=int, default=20260723)
     gsra.set_defaults(handler=_gsra_benchmark_command)
+
+    gqra = subparsers.add_parser(
+        "gqra-audit",
+        help="Validate the matched Gauge-Quotient Representation Alignment screen",
+    )
+    gqra.add_argument("--runs", nargs="+", required=True, metavar="METHOD=PATH")
+    gqra.add_argument("--output-dir", default="outputs/reve_gqra_screen/aggregate")
+    gqra.add_argument("--expected-seeds", nargs="+", type=int, default=[7, 21, 42])
+    gqra.add_argument("--bootstrap-resamples", type=int, default=10000)
+    gqra.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    gqra.add_argument("--bootstrap-seed", type=int, default=20260724)
+    gqra.set_defaults(handler=_gqra_benchmark_command)
     return parser
 
 

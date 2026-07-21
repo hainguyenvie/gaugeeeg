@@ -285,6 +285,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     )
     auxiliary_gate_supervision_weight = float(experiment.get("auxiliary_gate_supervision_weight", 0.0))
     auxiliary_target_classes = [int(value) for value in experiment.get("auxiliary_target_classes", [2, 3])]
+    representation_contrastive_weight = float(experiment.get("representation_contrastive_weight", 0.0))
+    representation_bilaterality_weight = float(experiment.get("representation_bilaterality_weight", 0.0))
+    representation_temperature = float(experiment.get("representation_temperature", 0.1))
     consistency_weight = float(experiment.get("consistency_weight", 0.0))
     views = [str(view) for view in experiment.get("test_views", ["car"])]
     validation_prediction_views = [str(view) for view in experiment.get("validation_prediction_views", views)]
@@ -419,6 +422,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         validation_auxiliary_gate_target_mean = float("nan")
         validation_auxiliary_gate_nontarget_mean = float("nan")
         validation_auxiliary_gate_supervision_loss = float("nan")
+        validation_representation_alignment_loss = float("nan")
+        validation_representation_class_margin = float("nan")
+        validation_representation_bilaterality_balanced_accuracy = float("nan")
         if probe_name == "sklearn_logreg":
             if len(training_views) != 1:
                 raise ValueError("sklearn_logreg does not support aligned multi-view training")
@@ -503,6 +509,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                     auxiliary_residual_consistency_weight=(auxiliary_residual_consistency_weight),
                     auxiliary_gate_supervision_weight=auxiliary_gate_supervision_weight,
                     auxiliary_target_classes=auxiliary_target_classes,
+                    representation_contrastive_weight=representation_contrastive_weight,
+                    representation_bilaterality_weight=representation_bilaterality_weight,
+                    representation_temperature=representation_temperature,
                     **common_probe_kwargs,
                 )
             predictor = probe.model
@@ -517,6 +526,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             validation_auxiliary_gate_target_mean = probe.validation_auxiliary_gate_target_mean
             validation_auxiliary_gate_nontarget_mean = probe.validation_auxiliary_gate_nontarget_mean
             validation_auxiliary_gate_supervision_loss = probe.validation_auxiliary_gate_supervision_loss
+            validation_representation_alignment_loss = probe.validation_representation_alignment_loss
+            validation_representation_class_margin = probe.validation_representation_class_margin
+            validation_representation_bilaterality_balanced_accuracy = (
+                probe.validation_representation_bilaterality_balanced_accuracy
+            )
             pd.DataFrame(probe.history).to_csv(output_dir / f"probe_history_{defense}.csv", index=False)
 
             if bool(experiment.get("save_probe_checkpoint", True)):
@@ -549,6 +563,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                             "auxiliary_residual_consistency_weight": (auxiliary_residual_consistency_weight),
                             "auxiliary_gate_supervision_weight": auxiliary_gate_supervision_weight,
                             "auxiliary_target_classes": auxiliary_target_classes,
+                            "representation_contrastive_weight": (representation_contrastive_weight),
+                            "representation_bilaterality_weight": (representation_bilaterality_weight),
+                            "representation_temperature": representation_temperature,
                         },
                         output_dir / f"probe_best_{defense}.pt",
                     )
@@ -872,6 +889,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             "auxiliary_residual_consistency_weight": auxiliary_residual_consistency_weight,
             "auxiliary_gate_supervision_weight": auxiliary_gate_supervision_weight,
             "auxiliary_target_classes": auxiliary_target_classes,
+            "representation_contrastive_weight": representation_contrastive_weight,
+            "representation_bilaterality_weight": representation_bilaterality_weight,
+            "representation_temperature": representation_temperature,
             "trainable_parameters": trainable_parameters,
             "auxiliary_parameters": auxiliary_parameters,
             "auxiliary_reference_max_abs_diff": auxiliary_reference_max_abs_diff,
@@ -885,6 +905,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             "validation_auxiliary_gate_target_mean": validation_auxiliary_gate_target_mean,
             "validation_auxiliary_gate_nontarget_mean": (validation_auxiliary_gate_nontarget_mean),
             "validation_auxiliary_gate_supervision_loss": (validation_auxiliary_gate_supervision_loss),
+            "validation_representation_alignment_loss": (validation_representation_alignment_loss),
+            "validation_representation_class_margin": validation_representation_class_margin,
+            "validation_representation_bilaterality_balanced_accuracy": (
+                validation_representation_bilaterality_balanced_accuracy
+            ),
             "validation_prediction_views": validation_prediction_views,
             "validation_predictions_only": True,
             "prediction_split": prediction_split,
@@ -967,6 +992,9 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "auxiliary_residual_consistency_weight": auxiliary_residual_consistency_weight,
         "auxiliary_gate_supervision_weight": auxiliary_gate_supervision_weight,
         "auxiliary_target_classes": auxiliary_target_classes,
+        "representation_contrastive_weight": representation_contrastive_weight,
+        "representation_bilaterality_weight": representation_bilaterality_weight,
+        "representation_temperature": representation_temperature,
         "trainable_parameters": trainable_parameters,
         "auxiliary_parameters": auxiliary_parameters,
         "auxiliary_reference_max_abs_diff": auxiliary_reference_max_abs_diff,
@@ -984,6 +1012,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "validation_auxiliary_gate_target_mean": validation_auxiliary_gate_target_mean,
         "validation_auxiliary_gate_nontarget_mean": validation_auxiliary_gate_nontarget_mean,
         "validation_auxiliary_gate_supervision_loss": validation_auxiliary_gate_supervision_loss,
+        "validation_representation_alignment_loss": validation_representation_alignment_loss,
+        "validation_representation_class_margin": validation_representation_class_margin,
+        "validation_representation_bilaterality_balanced_accuracy": (
+            validation_representation_bilaterality_balanced_accuracy
+        ),
         "n_trials": int(dataset.y.size),
         "n_channels": len(dataset.channel_names),
         "sfreq": dataset.sfreq,

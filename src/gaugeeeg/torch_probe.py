@@ -24,6 +24,9 @@ class TorchProbeResult:
     validation_auxiliary_gate_target_mean: float = float("nan")
     validation_auxiliary_gate_nontarget_mean: float = float("nan")
     validation_auxiliary_gate_supervision_loss: float = float("nan")
+    validation_representation_alignment_loss: float = float("nan")
+    validation_representation_class_margin: float = float("nan")
+    validation_representation_bilaterality_balanced_accuracy: float = float("nan")
 
 
 class TorchTokenPredictor:

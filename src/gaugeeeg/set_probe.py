@@ -133,6 +133,38 @@ class TorchSetPredictor(TorchTokenPredictor):
             for name, values in collected.items()
         }
 
+    def predict_representation_components(self, x) -> dict[str, NDArray[np.float32]]:
+        """Return FiLM-conditioned embeddings and bilaterality logits."""
+
+        import torch
+
+        if not isinstance(x, tuple) or len(x) != 2:
+            raise ValueError("Representation diagnostics require (REVE tokens, auxiliary tokens)")
+        tokens, auxiliary = (np.asarray(value) for value in x)
+        if tokens.shape[0] != auxiliary.shape[0]:
+            raise ValueError("REVE and auxiliary diagnostic trials are not aligned")
+        collected = {name: [] for name in ("logits", "representation", "bilaterality_logits")}
+        self.module.eval()
+        with torch.inference_mode():
+            for start in range(0, tokens.shape[0], self.batch_size):
+                token_batch = torch.from_numpy(tokens[start : start + self.batch_size]).to(
+                    self.device, dtype=torch.float32
+                )
+                auxiliary_batch = torch.from_numpy(auxiliary[start : start + self.batch_size]).to(
+                    self.device, dtype=torch.float32
+                )
+                output = self.module(
+                    token_batch,
+                    auxiliary_batch,
+                    return_representation_components=True,
+                )
+                for name, value in zip(collected, output, strict=True):
+                    collected[name].append(value.float().cpu().numpy())
+        return {
+            name: np.concatenate(values, axis=0).astype(np.float32, copy=False)
+            for name, values in collected.items()
+        }
+
 
 def fit_reve_set_probe(
     train_x: FeatureViews,
@@ -169,6 +201,9 @@ def fit_reve_set_probe(
     auxiliary_residual_consistency_weight: float = 0.0,
     auxiliary_gate_supervision_weight: float = 0.0,
     auxiliary_target_classes: Sequence[int] = (2, 3),
+    representation_contrastive_weight: float = 0.0,
+    representation_bilaterality_weight: float = 0.0,
+    representation_temperature: float = 0.1,
 ) -> TorchProbeResult:
     """Fit a pooling-by-multihead-attention probe on a variable token set.
 
@@ -227,10 +262,10 @@ def fit_reve_set_probe(
     if consistency_weight < 0.0:
         raise ValueError("consistency_weight must be non-negative")
     auxiliary_fusion = str(auxiliary_fusion).casefold()
-    if auxiliary_fusion not in {"residual", "gated_residual"}:
-        raise ValueError("auxiliary_fusion must be 'residual' or 'gated_residual'")
+    if auxiliary_fusion not in {"residual", "gated_residual", "film"}:
+        raise ValueError("auxiliary_fusion must be 'residual', 'gated_residual', or 'film'")
     if not use_auxiliary and auxiliary_fusion != "residual":
-        raise ValueError("gated_residual requires auxiliary features")
+        raise ValueError(f"{auxiliary_fusion} requires auxiliary features")
     if not 0.0 < auxiliary_gate_initial_probability < 1.0:
         raise ValueError("auxiliary_gate_initial_probability must be in (0, 1)")
     if (
@@ -255,6 +290,28 @@ def fit_reve_set_probe(
         raise ValueError("Auxiliary losses require auxiliary features")
     if auxiliary_gate_supervision_weight > 0.0 and auxiliary_fusion != "gated_residual":
         raise ValueError("Gate supervision requires gated_residual fusion")
+    if representation_contrastive_weight < 0.0 or representation_bilaterality_weight < 0.0:
+        raise ValueError("Representation loss weights must be non-negative")
+    if representation_temperature <= 0.0 or not np.isfinite(representation_temperature):
+        raise ValueError("representation_temperature must be finite and positive")
+    if (
+        any(
+            weight > 0.0 for weight in (representation_contrastive_weight, representation_bilaterality_weight)
+        )
+        and auxiliary_fusion != "film"
+    ):
+        raise ValueError("Representation losses require film fusion")
+    if auxiliary_fusion == "film" and any(
+        weight > 0.0
+        for weight in (
+            auxiliary_preservation_weight,
+            auxiliary_residual_consistency_weight,
+            auxiliary_gate_supervision_weight,
+        )
+    ):
+        raise ValueError("Residual-adapter losses are not compatible with film fusion")
+    if representation_bilaterality_weight > 0.0 and not target_classes:
+        raise ValueError("Bilaterality supervision requires target classes")
     if consistency_view_weights is None or objective == "car_only":
         # The car_only control trains on a single view and applies no
         # consistency term, so any globally configured multi-view weights are
@@ -350,22 +407,41 @@ def fit_reve_set_probe(
                     batch_first=True,
                 )
                 self.auxiliary_norm = nn.LayerNorm(embed_dim)
-                self.auxiliary_linear = nn.Linear(auxiliary_queries * embed_dim, n_classes)
-                # The first forward pass is exactly the existing REVE head.
-                # The residual branch receives gradients through this layer,
-                # then learns only when the data support an auxiliary update.
-                nn.init.zeros_(self.auxiliary_linear.weight)
-                nn.init.zeros_(self.auxiliary_linear.bias)
-                if auxiliary_fusion == "gated_residual":
-                    gate_features = auxiliary_queries * embed_dim + n_classes
-                    self.auxiliary_gate = nn.Linear(gate_features, 1)
-                    nn.init.zeros_(self.auxiliary_gate.weight)
-                    initial_logit = math.log(
-                        auxiliary_gate_initial_probability / (1.0 - auxiliary_gate_initial_probability)
+                if auxiliary_fusion == "film":
+                    self.auxiliary_conditioner = nn.Sequential(
+                        nn.Linear(auxiliary_queries * embed_dim, auxiliary_hidden_dim),
+                        nn.GELU(),
+                        nn.LayerNorm(auxiliary_hidden_dim),
+                        nn.Linear(auxiliary_hidden_dim, 2 * embed_dim),
                     )
-                    nn.init.constant_(self.auxiliary_gate.bias, initial_logit)
+                    self.auxiliary_representation_norm = nn.LayerNorm(embed_dim)
+                    self.auxiliary_bilaterality_head = nn.Linear(embed_dim, 2)
+                    # Identity initialization makes the first forward pass the
+                    # frozen-REVE set head; GQBA can only change the embedding
+                    # when training supports a rule-conditioned update.
+                    nn.init.zeros_(self.auxiliary_conditioner[-1].weight)
+                    nn.init.zeros_(self.auxiliary_conditioner[-1].bias)
+                else:
+                    self.auxiliary_linear = nn.Linear(auxiliary_queries * embed_dim, n_classes)
+                    nn.init.zeros_(self.auxiliary_linear.weight)
+                    nn.init.zeros_(self.auxiliary_linear.bias)
+                    if auxiliary_fusion == "gated_residual":
+                        gate_features = auxiliary_queries * embed_dim + n_classes
+                        self.auxiliary_gate = nn.Linear(gate_features, 1)
+                        nn.init.zeros_(self.auxiliary_gate.weight)
+                        initial_logit = math.log(
+                            auxiliary_gate_initial_probability / (1.0 - auxiliary_gate_initial_probability)
+                        )
+                        nn.init.constant_(self.auxiliary_gate.bias, initial_logit)
 
-        def forward(self, tokens, auxiliary=None, *, return_components=False):
+        def forward(
+            self,
+            tokens,
+            auxiliary=None,
+            *,
+            return_components=False,
+            return_representation_components=False,
+        ):
             queries = self.queries.unsqueeze(0).expand(tokens.shape[0], -1, -1)
             # Request explicit weights to avoid fused SDPA kernels whose exact
             # deterministic behavior varies across PyTorch/CUDA releases.
@@ -376,7 +452,7 @@ def fit_reve_set_probe(
             if not self.uses_auxiliary:
                 if auxiliary is not None:
                     raise ValueError("This REVE set head was fitted without auxiliary tokens")
-                if return_components:
+                if return_components or return_representation_components:
                     raise ValueError("Auxiliary components require an auxiliary branch")
                 return logits
             if auxiliary is None:
@@ -392,6 +468,21 @@ def fit_reve_set_probe(
             )
             auxiliary_context = self.auxiliary_norm(auxiliary_queries_batch + auxiliary_context)
             auxiliary_flat = self.dropout(auxiliary_context.flatten(1))
+            if auxiliary_fusion == "film":
+                gamma, beta = self.auxiliary_conditioner(auxiliary_flat).chunk(2, dim=-1)
+                conditioned_context = self.auxiliary_representation_norm(
+                    context * (1.0 + torch.tanh(gamma).unsqueeze(1)) + beta.unsqueeze(1)
+                )
+                representation = conditioned_context.mean(dim=1)
+                final = self.linear(self.dropout(conditioned_context.flatten(1)))
+                bilaterality_logits = self.auxiliary_bilaterality_head(self.dropout(representation))
+                if return_components:
+                    raise ValueError("Residual components are unavailable for film fusion")
+                if return_representation_components:
+                    return final, representation, bilaterality_logits
+                return final
+            if return_representation_components:
+                raise ValueError("Representation components require film fusion")
             residual = self.auxiliary_linear(auxiliary_flat)
             if auxiliary_fusion == "gated_residual":
                 gate_input = torch.cat([auxiliary_flat, logits.detach()], dim=-1)
@@ -410,6 +501,23 @@ def fit_reve_set_probe(
         optimizer, mode="max", factor=0.5, patience=patience
     )
     criterion = nn.CrossEntropyLoss()
+
+    def supervised_contrastive_loss(representations, labels):
+        """Class-balanced SupCon over every aligned montage representation."""
+
+        normalized = torch.nn.functional.normalize(representations.flatten(0, 1), dim=-1)
+        repeated_labels = labels[:, None].expand(-1, representations.shape[1]).reshape(-1)
+        similarity = normalized @ normalized.T / representation_temperature
+        diagonal = torch.eye(similarity.shape[0], dtype=torch.bool, device=similarity.device)
+        similarity = similarity - similarity.max(dim=1, keepdim=True).values.detach()
+        exp_similarity = torch.exp(similarity).masked_fill(diagonal, 0.0)
+        log_probability = similarity - torch.log(exp_similarity.sum(dim=1, keepdim=True).clamp_min(1e-8))
+        positive = repeated_labels[:, None].eq(repeated_labels[None, :]) & ~diagonal
+        positive_count = positive.sum(dim=1)
+        if torch.any(positive_count == 0):
+            raise RuntimeError("Supervised contrastive batch contains a class without positives")
+        return -((log_probability * positive).sum(dim=1) / positive_count.to(log_probability.dtype)).mean()
+
     generator = torch.Generator().manual_seed(seed)
     train_view_tensors = [torch.from_numpy(np.asarray(view)) for view in train_views]
     train_auxiliary_tensors = [torch.from_numpy(np.asarray(view)) for view in train_aux_views]
@@ -435,6 +543,9 @@ def fit_reve_set_probe(
     best_gate_target = float("nan")
     best_gate_nontarget = float("nan")
     best_gate_supervision = float("nan")
+    best_representation_alignment = float("nan")
+    best_representation_class_margin = float("nan")
+    best_representation_bilaterality = float("nan")
     best_state = None
     stale_epochs = 0
     history: list[dict[str, float]] = []
@@ -447,6 +558,8 @@ def fit_reve_set_probe(
         epoch_auxiliary_preservation = 0.0
         epoch_auxiliary_residual_consistency = 0.0
         epoch_auxiliary_gate_supervision = 0.0
+        epoch_representation_contrastive = 0.0
+        epoch_representation_bilaterality = 0.0
         for indices, labels in train_loader:
             labels = labels.to(device, dtype=torch.long, non_blocking=True)
             if global_step < total_warmup_steps:
@@ -462,20 +575,32 @@ def fit_reve_set_probe(
                     else train_auxiliary_tensors[view_index][indices].to(
                         device, dtype=torch.float32, non_blocking=True
                     ),
-                    return_components=use_auxiliary,
+                    return_components=use_auxiliary and auxiliary_fusion != "film",
+                    return_representation_components=(use_auxiliary and auxiliary_fusion == "film"),
                 )
                 for view_index, tokens in enumerate(train_view_tensors)
             ]
-            if use_auxiliary:
+            if use_auxiliary and auxiliary_fusion == "film":
+                logits = torch.stack([output[0] for output in model_outputs], dim=1)
+                representations = torch.stack([output[1] for output in model_outputs], dim=1)
+                bilaterality_logits = torch.stack([output[2] for output in model_outputs], dim=1)
+                base_logits = None
+                applied_residuals = None
+                auxiliary_gates = None
+            elif use_auxiliary:
                 logits = torch.stack([output[0] for output in model_outputs], dim=1)
                 base_logits = torch.stack([output[1] for output in model_outputs], dim=1)
                 applied_residuals = torch.stack([output[2] for output in model_outputs], dim=1)
                 auxiliary_gates = torch.stack([output[3] for output in model_outputs], dim=1)
+                representations = None
+                bilaterality_logits = None
             else:
                 logits = torch.stack(model_outputs, dim=1)
                 base_logits = None
                 applied_residuals = None
                 auxiliary_gates = None
+                representations = None
+                bilaterality_logits = None
             if objective == "car_only":
                 ce_loss = criterion(logits[:, 0], labels)
             else:
@@ -511,6 +636,8 @@ def fit_reve_set_probe(
             auxiliary_preservation_loss = logits.new_zeros(())
             auxiliary_residual_consistency_loss = logits.new_zeros(())
             auxiliary_gate_supervision_loss = logits.new_zeros(())
+            representation_contrastive_loss = logits.new_zeros(())
+            representation_bilaterality_loss = logits.new_zeros(())
             target_mask = torch.zeros_like(labels, dtype=torch.bool)
             for class_index in target_classes:
                 target_mask |= labels.eq(class_index)
@@ -540,12 +667,25 @@ def fit_reve_set_probe(
                 auxiliary_gate_supervision_loss = torch.nn.functional.binary_cross_entropy(
                     auxiliary_gates, gate_target.to(dtype=auxiliary_gates.dtype)
                 )
+            if representations is not None and representation_contrastive_weight > 0.0:
+                representation_contrastive_loss = supervised_contrastive_loss(
+                    representations,
+                    labels,
+                )
+            if bilaterality_logits is not None and representation_bilaterality_weight > 0.0:
+                bilateral_target = target_mask.to(dtype=torch.long)
+                representation_bilaterality_loss = criterion(
+                    bilaterality_logits.flatten(0, 1),
+                    bilateral_target[:, None].expand(-1, bilaterality_logits.shape[1]).reshape(-1),
+                )
             loss = (
                 ce_loss
                 + consistency_weight * consistency_loss
                 + auxiliary_preservation_weight * auxiliary_preservation_loss
                 + auxiliary_residual_consistency_weight * auxiliary_residual_consistency_loss
                 + auxiliary_gate_supervision_weight * auxiliary_gate_supervision_loss
+                + representation_contrastive_weight * representation_contrastive_loss
+                + representation_bilaterality_weight * representation_bilaterality_loss
             )
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=clip_grad)
@@ -559,6 +699,12 @@ def fit_reve_set_probe(
             )
             epoch_auxiliary_gate_supervision += (
                 float(auxiliary_gate_supervision_loss.item()) * labels.shape[0]
+            )
+            epoch_representation_contrastive += (
+                float(representation_contrastive_loss.item()) * labels.shape[0]
+            )
+            epoch_representation_bilaterality += (
+                float(representation_bilaterality_loss.item()) * labels.shape[0]
             )
             global_step += 1
 
@@ -615,7 +761,54 @@ def fit_reve_set_probe(
         validation_gate_target = float("nan")
         validation_gate_nontarget = float("nan")
         validation_gate_supervision = 0.0
-        if use_auxiliary:
+        validation_representation_alignment = float("nan")
+        validation_representation_class_margin = float("nan")
+        validation_representation_bilaterality = float("nan")
+        if use_auxiliary and auxiliary_fusion == "film":
+            components = [
+                predictor.predict_representation_components((view, val_aux_views[view_index]))
+                for view_index, view in enumerate(val_views)
+            ]
+            representations_numpy = np.stack([item["representation"] for item in components], axis=1).astype(
+                np.float64
+            )
+            representation_norms = np.linalg.norm(representations_numpy, axis=-1, keepdims=True)
+            normalized_representations = representations_numpy / np.maximum(representation_norms, 1e-8)
+            mean_representation = normalized_representations.mean(axis=1)
+            mean_representation /= np.maximum(
+                np.linalg.norm(mean_representation, axis=-1, keepdims=True), 1e-8
+            )
+            validation_representation_alignment = float(
+                np.mean(
+                    1.0
+                    - np.sum(
+                        normalized_representations * mean_representation[:, None, :],
+                        axis=-1,
+                    )
+                )
+            )
+            class_centroids = []
+            for class_index in range(n_classes):
+                centroid = mean_representation[np.asarray(val_y) == class_index].mean(axis=0)
+                centroid /= max(float(np.linalg.norm(centroid)), 1e-8)
+                class_centroids.append(centroid)
+            centroid_matrix = np.stack(class_centroids)
+            centroid_similarity = mean_representation @ centroid_matrix.T
+            own_similarity = centroid_similarity[np.arange(val_y.size), np.asarray(val_y)]
+            other_similarity = centroid_similarity.copy()
+            other_similarity[np.arange(val_y.size), np.asarray(val_y)] = -np.inf
+            validation_representation_class_margin = float(
+                np.mean(own_similarity - np.max(other_similarity, axis=1))
+            )
+            bilaterality_logits_numpy = np.stack([item["bilaterality_logits"] for item in components], axis=1)
+            bilaterality_targets = np.isin(val_y, target_classes).astype(np.int64)
+            validation_representation_bilaterality = float(
+                balanced_accuracy_score(
+                    np.repeat(bilaterality_targets, len(val_views)),
+                    bilaterality_logits_numpy.argmax(axis=-1).reshape(-1),
+                )
+            )
+        elif use_auxiliary:
             components = [
                 predictor.predict_auxiliary_components((view, val_aux_views[view_index]))
                 for view_index, view in enumerate(val_views)
@@ -681,11 +874,22 @@ def fit_reve_set_probe(
                 "train_auxiliary_gate_supervision_loss": float(
                     epoch_auxiliary_gate_supervision / train_y.size
                 ),
+                "train_representation_contrastive_loss": float(
+                    epoch_representation_contrastive / train_y.size
+                ),
+                "train_representation_bilaterality_loss": float(
+                    epoch_representation_bilaterality / train_y.size
+                ),
                 "validation_auxiliary_preservation_loss": validation_auxiliary_preservation,
                 "validation_auxiliary_consistency_loss": validation_auxiliary_consistency,
                 "validation_auxiliary_gate_target_mean": validation_gate_target,
                 "validation_auxiliary_gate_nontarget_mean": validation_gate_nontarget,
                 "validation_auxiliary_gate_supervision_loss": validation_gate_supervision,
+                "validation_representation_alignment_loss": (validation_representation_alignment),
+                "validation_representation_class_margin": (validation_representation_class_margin),
+                "validation_representation_bilaterality_balanced_accuracy": (
+                    validation_representation_bilaterality
+                ),
                 "validation_car_balanced_accuracy": clean_score,
                 "validation_balanced_accuracy": score,
                 "validation_consistency_loss": validation_consistency,
@@ -708,6 +912,9 @@ def fit_reve_set_probe(
             best_gate_target = validation_gate_target
             best_gate_nontarget = validation_gate_nontarget
             best_gate_supervision = validation_gate_supervision
+            best_representation_alignment = validation_representation_alignment
+            best_representation_class_margin = validation_representation_class_margin
+            best_representation_bilaterality = validation_representation_bilaterality
             best_state = deepcopy(model.state_dict())
             stale_epochs = 0
         else:
@@ -743,4 +950,7 @@ def fit_reve_set_probe(
         best_gate_target,
         best_gate_nontarget,
         best_gate_supervision,
+        best_representation_alignment,
+        best_representation_class_margin,
+        best_representation_bilaterality,
     )

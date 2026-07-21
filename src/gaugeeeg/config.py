@@ -86,10 +86,10 @@ def validate_config(config: dict[str, Any]) -> None:
     if int(experiment.get("auxiliary_hidden_dim", 64)) < 1:
         raise ValueError("auxiliary_hidden_dim must be positive")
     auxiliary_fusion = str(experiment.get("auxiliary_fusion", "residual")).casefold()
-    if auxiliary_fusion not in {"residual", "gated_residual"}:
-        raise ValueError("auxiliary_fusion must be 'residual' or 'gated_residual'")
+    if auxiliary_fusion not in {"residual", "gated_residual", "film"}:
+        raise ValueError("auxiliary_fusion must be 'residual', 'gated_residual', or 'film'")
     if probe_auxiliary == "none" and auxiliary_fusion != "residual":
-        raise ValueError("gated_residual requires a probe_auxiliary representation")
+        raise ValueError(f"{auxiliary_fusion} requires a probe_auxiliary representation")
     gate_probability = float(experiment.get("auxiliary_gate_initial_probability", 0.25))
     if not math.isfinite(gate_probability) or not 0.0 < gate_probability < 1.0:
         raise ValueError("auxiliary_gate_initial_probability must be finite and in (0, 1)")
@@ -115,6 +115,30 @@ def validate_config(config: dict[str, Any]) -> None:
             raise ValueError("Gate supervision requires auxiliary_fusion: gated_residual")
         if not target_classes:
             raise ValueError("Gate supervision requires at least one auxiliary_target_class")
+    representation_contrastive_weight = float(experiment.get("representation_contrastive_weight", 0.0))
+    representation_bilaterality_weight = float(experiment.get("representation_bilaterality_weight", 0.0))
+    representation_temperature = float(experiment.get("representation_temperature", 0.1))
+    for key, value in (
+        ("representation_contrastive_weight", representation_contrastive_weight),
+        ("representation_bilaterality_weight", representation_bilaterality_weight),
+    ):
+        if not math.isfinite(value) or value < 0.0:
+            raise ValueError(f"{key} must be finite and non-negative")
+        if value > 0.0 and auxiliary_fusion != "film":
+            raise ValueError(f"{key} requires auxiliary_fusion: film")
+    if not math.isfinite(representation_temperature) or representation_temperature <= 0.0:
+        raise ValueError("representation_temperature must be finite and positive")
+    if representation_bilaterality_weight > 0.0 and not target_classes:
+        raise ValueError("Bilaterality supervision requires at least one auxiliary_target_class")
+    if auxiliary_fusion == "film" and any(
+        float(experiment.get(key, 0.0)) > 0.0
+        for key in (
+            "auxiliary_preservation_weight",
+            "auxiliary_residual_consistency_weight",
+            "auxiliary_gate_supervision_weight",
+        )
+    ):
+        raise ValueError("GSRA residual losses are not compatible with auxiliary_fusion: film")
     training_views = [str(view).casefold() for view in experiment.get("training_views", ["car"])]
     if not training_views or training_views[0] != "car":
         raise ValueError("training_views must start with 'car'")
@@ -178,6 +202,9 @@ def with_overrides(
     auxiliary_residual_consistency_weight: float | None = None,
     auxiliary_gate_supervision_weight: float | None = None,
     auxiliary_target_classes: list[int] | None = None,
+    representation_contrastive_weight: float | None = None,
+    representation_bilaterality_weight: float | None = None,
+    representation_temperature: float | None = None,
 ) -> dict[str, Any]:
     result = deepcopy(config)
     experiment = result["experiment"]
@@ -219,6 +246,12 @@ def with_overrides(
         experiment["auxiliary_gate_supervision_weight"] = float(auxiliary_gate_supervision_weight)
     if auxiliary_target_classes is not None:
         experiment["auxiliary_target_classes"] = [int(value) for value in auxiliary_target_classes]
+    if representation_contrastive_weight is not None:
+        experiment["representation_contrastive_weight"] = float(representation_contrastive_weight)
+    if representation_bilaterality_weight is not None:
+        experiment["representation_bilaterality_weight"] = float(representation_bilaterality_weight)
+    if representation_temperature is not None:
+        experiment["representation_temperature"] = float(representation_temperature)
     validate_config(result)
     return result
 
