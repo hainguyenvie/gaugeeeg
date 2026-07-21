@@ -1,0 +1,16 @@
+method,run_dir,probe_seed,probe_auxiliary,auxiliary_fusion,auxiliary_preservation_weight,auxiliary_residual_consistency_weight,auxiliary_gate_supervision_weight,trainable_parameters,auxiliary_parameters,validation_gate_target_mean,validation_gate_nontarget_mean
+gated_spectral_control,outputs/reve_gsra_screen/gated_spectral_control_s7,7,spectral_capacity_control,gated_residual,0.0,0.0,0.0,3204877,1091849,0.15235529839992523,0.14734703302383423
+gated_spectral_control,outputs/reve_gsra_screen/gated_spectral_control_s21,21,spectral_capacity_control,gated_residual,0.0,0.0,0.0,3204877,1091849,0.19473271071910858,0.18930694460868835
+gated_spectral_control,outputs/reve_gsra_screen/gated_spectral_control_s42,42,spectral_capacity_control,gated_residual,0.0,0.0,0.0,3204877,1091849,0.21728266775608063,0.2130909413099289
+gqba_gated_ce,outputs/reve_gsra_screen/gqba_gated_ce_s7,7,gqba_odd_even,gated_residual,0.0,0.0,0.0,3204877,1091849,0.0903506726026535,0.08715396374464035
+gqba_gated_ce,outputs/reve_gsra_screen/gqba_gated_ce_s21,21,gqba_odd_even,gated_residual,0.0,0.0,0.0,3204877,1091849,0.18271806836128235,0.1698576658964157
+gqba_gated_ce,outputs/reve_gsra_screen/gqba_gated_ce_s42,42,gqba_odd_even,gated_residual,0.0,0.0,0.0,3204877,1091849,0.1848086714744568,0.17717909812927246
+gqba_odd_even,outputs/reve_gqba_screen/gqba_odd_even_s7,7,gqba_odd_even,residual,0.0,0.0,0.0,3203848,1090820,,
+gqba_odd_even,outputs/reve_gqba_screen/gqba_odd_even_s21,21,gqba_odd_even,residual,0.0,0.0,0.0,3203848,1090820,,
+gqba_odd_even,outputs/reve_gqba_screen/gqba_odd_even_s42,42,gqba_odd_even,residual,0.0,0.0,0.0,3203848,1090820,,
+gsra,outputs/reve_gsra_screen/gsra_s7,7,gqba_odd_even,gated_residual,1.0,0.1,0.1,3204877,1091849,0.5165249109268188,0.42875608801841736
+gsra,outputs/reve_gsra_screen/gsra_s21,21,gqba_odd_even,gated_residual,1.0,0.1,0.1,3204877,1091849,0.5055150389671326,0.42997631430625916
+gsra,outputs/reve_gsra_screen/gsra_s42,42,gqba_odd_even,gated_residual,1.0,0.1,0.1,3204877,1091849,0.5711430311203003,0.493826687335968
+joint_multiview_ce,outputs/reve_benchmark_lock/joint_multiview_ce_s7,7,none,residual,0.0,0.0,0.0,0,0,,
+joint_multiview_ce,outputs/reve_benchmark_lock/joint_multiview_ce_s21,21,none,residual,0.0,0.0,0.0,0,0,,
+joint_multiview_ce,outputs/reve_benchmark_lock/joint_multiview_ce_s42,42,none,residual,0.0,0.0,0.0,0,0,,

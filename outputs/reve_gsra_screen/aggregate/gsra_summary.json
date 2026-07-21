@@ -1,0 +1,29 @@
+{
+  "stage": "GaugeEEG GSRA locked development screen",
+  "status": "development_method_screen_only",
+  "primary_metric": "mean BAcc over native16@{CAR,Cz,Pz,Fz}",
+  "proposed_method": "gsra",
+  "strong_baseline": "joint_multiview_ce",
+  "capacity_control": "gated_spectral_control",
+  "architecture_ablation": "gqba_gated_ce",
+  "prior_ungated_ablation": "gqba_odd_even",
+  "physionetmi_is_globally_untouched_test": false,
+  "external_dataset_required_for_confirmation": true,
+  "parameter_count_match": [
+    3204877,
+    1091849
+  ],
+  "validation_gate_target_minus_nontarget": 0.08020796378453572,
+  "gates": {
+    "primary_ci_above_zero_vs_joint": false,
+    "beats_gated_capacity_control": false,
+    "beats_gqba_gated_ce_ablation": false,
+    "clean_car_noninferior_to_joint": false,
+    "native32_noninferior_to_joint": false,
+    "all_native16_classes_preserved": false,
+    "both_fists_gain_at_least_0p03_with_positive_ci": false,
+    "validation_gate_prefers_target_class": true
+  },
+  "hypothesis_supported": false,
+  "interpretation_if_failed": "Retain joint_multiview_ce; do not tune GSRA on subjects 71--89."
+}
