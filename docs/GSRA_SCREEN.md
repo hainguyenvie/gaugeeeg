@@ -63,7 +63,9 @@ outputs/reve_gsra_screen/aggregate/gsra_summary.json
 ```
 
 Return the three new candidate directories for every seed plus `aggregate`.
-The large existing REVE feature cache is not required.
+The runner also creates `outputs/reve_gsra_screen/validation_predictions.tar.gz`;
+commit that archive instead of the nine individual prediction CSV files. The
+large existing REVE feature cache is not required.
 
 ## Frozen advancement gates
 

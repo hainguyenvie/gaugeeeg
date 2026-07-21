@@ -58,9 +58,11 @@ run_candidate() {
       --output-dir "${output_dir}"
   fi
   RUN_SPECS+=("${method}=${output_dir}")
+  PREDICTION_FILES+=("${output_dir}/validation_predictions.csv")
 }
 
 RUN_SPECS=()
+PREDICTION_FILES=()
 read -r -a SEED_ARRAY <<< "${SEEDS}"
 for seed in "${SEED_ARRAY[@]}"; do
   joint_control="${BASELINE_ROOT}/joint_multiview_ce_s${seed}"
@@ -86,6 +88,10 @@ done
   --runs "${RUN_SPECS[@]}" \
   --expected-seeds "${SEED_ARRAY[@]}" \
   --output-dir "${OUTPUT_ROOT}/aggregate"
+
+tar --no-recursion -czf \
+  "${OUTPUT_ROOT}/validation_predictions.tar.gz" \
+  "${PREDICTION_FILES[@]}"
 
 echo "Completed the locked GSRA development screen."
 python -m json.tool "${OUTPUT_ROOT}/aggregate/gsra_summary.json"
