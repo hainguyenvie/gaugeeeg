@@ -1,0 +1,33 @@
+{
+  "stage": "GaugeEEG GQRA locked development screen",
+  "status": "development_method_screen_only",
+  "primary_metric": "mean BAcc over native16@{CAR,Cz,Pz,Fz}",
+  "proposed_method": "gqra",
+  "strong_baseline": "joint_multiview_ce",
+  "capacity_control": "film_spectral_control",
+  "feature_and_objective_ablation": "gqba_film_ce",
+  "prior_failed_method": "gsra",
+  "physionetmi_is_globally_untouched_test": false,
+  "external_dataset_required_for_confirmation": true,
+  "parameter_count_match": [
+    3334086,
+    1221058
+  ],
+  "validation_representation_alignment": 0.02060777642776886,
+  "validation_ce_ablation_alignment": 0.045385740460314405,
+  "validation_bilaterality_balanced_accuracy": 0.6979423868312757,
+  "gates": {
+    "primary_ci_above_zero_vs_joint": false,
+    "beats_matched_spectral_control": false,
+    "beats_gqba_film_ce_ablation": false,
+    "beats_prior_gsra": false,
+    "clean_car_noninferior_to_joint": false,
+    "native32_noninferior_to_joint": false,
+    "all_native16_classes_preserved": false,
+    "both_fists_gain_at_least_0p03_with_positive_ci": true,
+    "representation_alignment_improves_over_ce": true,
+    "validation_bilaterality_bacc_at_least_0p55": true
+  },
+  "hypothesis_supported": false,
+  "interpretation_if_failed": "Retain joint_multiview_ce; do not tune GQRA on subjects 71--89."
+}

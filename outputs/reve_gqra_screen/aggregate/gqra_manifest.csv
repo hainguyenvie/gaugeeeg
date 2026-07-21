@@ -1,0 +1,16 @@
+method,run_dir,probe_seed,probe_auxiliary,auxiliary_fusion,representation_contrastive_weight,representation_bilaterality_weight,representation_temperature,trainable_parameters,auxiliary_parameters,validation_representation_alignment_loss,validation_representation_class_margin,validation_representation_bilaterality_balanced_accuracy
+film_spectral_control,outputs/reve_gqra_screen/film_spectral_control_s7,7,spectral_capacity_control,film,0.0,0.0,0.1,3334086,1221058,0.047413272546174834,0.014995313264912265,0.5092592592592593
+film_spectral_control,outputs/reve_gqra_screen/film_spectral_control_s21,21,spectral_capacity_control,film,0.0,0.0,0.1,3334086,1221058,0.04139119741002101,0.013372304102234776,0.48728395061728397
+film_spectral_control,outputs/reve_gqra_screen/film_spectral_control_s42,42,spectral_capacity_control,film,0.0,0.0,0.1,3334086,1221058,0.05166493976496294,0.016823922827464078,0.5065432098765432
+gqba_film_ce,outputs/reve_gqra_screen/gqba_film_ce_s7,7,gqba_odd_even,film,0.0,0.0,0.1,3334086,1221058,0.04799307262628605,0.016708831094030485,0.5237037037037037
+gqba_film_ce,outputs/reve_gqra_screen/gqba_film_ce_s21,21,gqba_odd_even,film,0.0,0.0,0.1,3334086,1221058,0.044144430590509674,0.016734525325012347,0.5045679012345679
+gqba_film_ce,outputs/reve_gqra_screen/gqba_film_ce_s42,42,gqba_odd_even,film,0.0,0.0,0.1,3334086,1221058,0.04401971816414747,0.014772932345321349,0.47654320987654325
+gqra,outputs/reve_gqra_screen/gqra_s7,7,gqba_odd_even,film,0.1,0.2,0.1,3334086,1221058,0.01781412686261793,0.012179455115046423,0.6987654320987655
+gqra,outputs/reve_gqra_screen/gqra_s21,21,gqba_odd_even,film,0.1,0.2,0.1,3334086,1221058,0.021642433782490887,0.013308784273072907,0.6825925925925926
+gqra,outputs/reve_gqra_screen/gqra_s42,42,gqba_odd_even,film,0.1,0.2,0.1,3334086,1221058,0.022366768638197764,0.01492827469176262,0.7124691358024691
+gsra,outputs/reve_gsra_screen/gsra_s7,7,gqba_odd_even,gated_residual,0.0,0.0,0.1,3204877,1091849,,,
+gsra,outputs/reve_gsra_screen/gsra_s21,21,gqba_odd_even,gated_residual,0.0,0.0,0.1,3204877,1091849,,,
+gsra,outputs/reve_gsra_screen/gsra_s42,42,gqba_odd_even,gated_residual,0.0,0.0,0.1,3204877,1091849,,,
+joint_multiview_ce,outputs/reve_benchmark_lock/joint_multiview_ce_s7,7,none,residual,0.0,0.0,0.1,0,0,,,
+joint_multiview_ce,outputs/reve_benchmark_lock/joint_multiview_ce_s21,21,none,residual,0.0,0.0,0.1,0,0,,,
+joint_multiview_ce,outputs/reve_benchmark_lock/joint_multiview_ce_s42,42,none,residual,0.0,0.0,0.1,0,0,,,

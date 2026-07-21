@@ -1,0 +1,295 @@
+{
+  "encoder": "reve",
+  "seed": 7,
+  "probe_seed": 7,
+  "reference_seed": 7,
+  "strict_determinism": true,
+  "probe": "reve_set",
+  "probe_objective": "multi_view_ce",
+  "probe_auxiliary": "spectral_capacity_control",
+  "probe_auxiliary_metadata": {
+    "mode": "spectral_capacity_control",
+    "n_pair_tokens": 6,
+    "token_dimension": 9,
+    "bands_hz": [
+      [
+        8.0,
+        13.0
+      ],
+      [
+        13.0,
+        20.0
+      ],
+      [
+        20.0,
+        30.0
+      ]
+    ],
+    "pairs": [
+      {
+        "left": "FC3",
+        "right": "FC4",
+        "midline": [
+          "Fz",
+          "Cz"
+        ]
+      },
+      {
+        "left": "FC1",
+        "right": "FC2",
+        "midline": [
+          "Fz",
+          "Cz"
+        ]
+      },
+      {
+        "left": "C3",
+        "right": "C4",
+        "midline": [
+          "Cz"
+        ]
+      },
+      {
+        "left": "C1",
+        "right": "C2",
+        "midline": [
+          "Cz"
+        ]
+      },
+      {
+        "left": "CP3",
+        "right": "CP4",
+        "midline": [
+          "CPz"
+        ]
+      },
+      {
+        "left": "CP1",
+        "right": "CP2",
+        "midline": [
+          "CPz"
+        ]
+      }
+    ],
+    "exact_common_reference_invariance": false,
+    "contains_antisymmetric_mode": false,
+    "contains_symmetric_reference_free_mode": false
+  },
+  "set_queries": 4,
+  "set_heads": 8,
+  "auxiliary_queries": 2,
+  "auxiliary_hidden_dim": 64,
+  "auxiliary_fusion": "film",
+  "auxiliary_gate_initial_probability": 0.25,
+  "auxiliary_preservation_weight": 0.0,
+  "auxiliary_residual_consistency_weight": 0.0,
+  "auxiliary_gate_supervision_weight": 0.0,
+  "auxiliary_target_classes": [
+    2,
+    3
+  ],
+  "representation_contrastive_weight": 0.0,
+  "representation_bilaterality_weight": 0.0,
+  "representation_temperature": 0.1,
+  "trainable_parameters": 3334086,
+  "auxiliary_parameters": 1221058,
+  "auxiliary_reference_max_abs_diff": NaN,
+  "training_views": [
+    "car",
+    "pz",
+    "fz",
+    "native32@car",
+    "native32@pz",
+    "native32@fz",
+    "native16@car",
+    "native16@pz",
+    "native16@fz"
+  ],
+  "defenses": [
+    "none"
+  ],
+  "defense_metadata": {
+    "none": {
+      "method": "none"
+    }
+  },
+  "consistency_weight": 0.0,
+  "consistency_view_weights": null,
+  "validation_auxiliary_preservation_loss": 0.0,
+  "validation_auxiliary_consistency_loss": 0.0,
+  "validation_auxiliary_gate_target_mean": NaN,
+  "validation_auxiliary_gate_nontarget_mean": NaN,
+  "validation_auxiliary_gate_supervision_loss": 0.0,
+  "validation_representation_alignment_loss": 0.047413272546174834,
+  "validation_representation_class_margin": 0.014995313264912265,
+  "validation_representation_bilaterality_balanced_accuracy": 0.5092592592592593,
+  "validation_prediction_views": [
+    "car",
+    "cz",
+    "pz",
+    "fz",
+    "native32@car",
+    "native32@cz",
+    "native32@pz",
+    "native32@fz",
+    "native16@car",
+    "native16@cz",
+    "native16@pz",
+    "native16@fz"
+  ],
+  "validation_predictions_only": true,
+  "prediction_split": "audit",
+  "validation_prediction_cache_namespace": "benchmark_dev",
+  "train_subjects": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60
+  ],
+  "probe_validation_subjects": [
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70
+  ],
+  "audit_subjects": [
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89
+  ],
+  "reserved_test_subjects": [
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109
+  ],
+  "all_subject_splits_pairwise_disjoint": true,
+  "probe_validation_audit_subjects_disjoint": true,
+  "physionet_test_subjects_used_for_fitting_or_scoring": false,
+  "validation_balanced_accuracy": 0.5585596837882973,
+  "selected_epoch": 16,
+  "n_prediction_trials": 1734,
+  "n_channels": 64,
+  "sfreq": 200.0,
+  "feature_cache_dir": "outputs/reve_benchmark_lock/feature_cache",
+  "dataset_fingerprint": "bcc4ee2d6dbe1725",
+  "encoder_metadata": {
+    "encoder": "reve",
+    "model_name": "brain-bzh/reve-base",
+    "model_revision": "fa9a2163a4b7c0a42c8e28b56077ef9c368944dc",
+    "position_model_name": "brain-bzh/reve-positions",
+    "position_model_revision": "befa5b57a455b77cf302daf610c2e9ed8140bace",
+    "pooling": "tokens",
+    "input_scale_uv": 100.0
+  },
+  "provenance": {
+    "git_commit": "c773fd36a6408d1ead1cb643bbdc83c2a5421c3e",
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.39",
+    "package_versions": {
+      "numpy": "2.5.1",
+      "pandas": "2.3.3",
+      "scikit-learn": "1.9.0",
+      "scipy": "1.18.0",
+      "mne": "1.12.1",
+      "torch": "2.13.0",
+      "transformers": "4.57.6"
+    }
+  },
+  "metrics_path": "outputs/reve_gqra_screen/film_spectral_control_s7/metrics.csv",
+  "validation_predictions_path": "outputs/reve_gqra_screen/film_spectral_control_s7/validation_predictions.csv"
+}
