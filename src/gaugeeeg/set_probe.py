@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from copy import deepcopy
 
@@ -104,6 +105,34 @@ class TorchSetPredictor(TorchTokenPredictor):
                 chunks.append(self.module(token_batch, auxiliary_batch).float().cpu().numpy())
         return np.concatenate(chunks, axis=0).astype(np.float32, copy=False)
 
+    def predict_auxiliary_components(self, x) -> dict[str, NDArray[np.float32]]:
+        """Return final/base/residual logits and gates for adapter diagnostics."""
+
+        import torch
+
+        if not isinstance(x, tuple) or len(x) != 2:
+            raise ValueError("Auxiliary diagnostics require (REVE tokens, auxiliary tokens)")
+        tokens, auxiliary = (np.asarray(value) for value in x)
+        if tokens.shape[0] != auxiliary.shape[0]:
+            raise ValueError("REVE and auxiliary diagnostic trials are not aligned")
+        collected = {name: [] for name in ("final", "base", "residual", "gate")}
+        self.module.eval()
+        with torch.inference_mode():
+            for start in range(0, tokens.shape[0], self.batch_size):
+                token_batch = torch.from_numpy(tokens[start : start + self.batch_size]).to(
+                    self.device, dtype=torch.float32
+                )
+                auxiliary_batch = torch.from_numpy(auxiliary[start : start + self.batch_size]).to(
+                    self.device, dtype=torch.float32
+                )
+                output = self.module(token_batch, auxiliary_batch, return_components=True)
+                for name, value in zip(collected, output, strict=True):
+                    collected[name].append(value.float().cpu().numpy())
+        return {
+            name: np.concatenate(values, axis=0).astype(np.float32, copy=False)
+            for name, values in collected.items()
+        }
+
 
 def fit_reve_set_probe(
     train_x: FeatureViews,
@@ -134,6 +163,12 @@ def fit_reve_set_probe(
     val_auxiliary: AuxiliaryViews | None = None,
     auxiliary_queries: int = 2,
     auxiliary_hidden_dim: int = 64,
+    auxiliary_fusion: str = "residual",
+    auxiliary_gate_initial_probability: float = 0.25,
+    auxiliary_preservation_weight: float = 0.0,
+    auxiliary_residual_consistency_weight: float = 0.0,
+    auxiliary_gate_supervision_weight: float = 0.0,
+    auxiliary_target_classes: Sequence[int] = (2, 3),
 ) -> TorchProbeResult:
     """Fit a pooling-by-multihead-attention probe on a variable token set.
 
@@ -191,6 +226,35 @@ def fit_reve_set_probe(
         raise ValueError(f"{objective} requires at least two aligned observation views")
     if consistency_weight < 0.0:
         raise ValueError("consistency_weight must be non-negative")
+    auxiliary_fusion = str(auxiliary_fusion).casefold()
+    if auxiliary_fusion not in {"residual", "gated_residual"}:
+        raise ValueError("auxiliary_fusion must be 'residual' or 'gated_residual'")
+    if not use_auxiliary and auxiliary_fusion != "residual":
+        raise ValueError("gated_residual requires auxiliary features")
+    if not 0.0 < auxiliary_gate_initial_probability < 1.0:
+        raise ValueError("auxiliary_gate_initial_probability must be in (0, 1)")
+    if (
+        auxiliary_preservation_weight < 0.0
+        or auxiliary_residual_consistency_weight < 0.0
+        or auxiliary_gate_supervision_weight < 0.0
+    ):
+        raise ValueError("Auxiliary loss weights must be non-negative")
+    target_classes = tuple(sorted({int(value) for value in auxiliary_target_classes}))
+    if any(value < 0 or value >= n_classes for value in target_classes):
+        raise ValueError("auxiliary_target_classes must be valid class indices")
+    if auxiliary_preservation_weight > 0.0 and not target_classes:
+        raise ValueError("Class preservation requires at least one auxiliary target class")
+    if not use_auxiliary and any(
+        weight > 0.0
+        for weight in (
+            auxiliary_preservation_weight,
+            auxiliary_residual_consistency_weight,
+            auxiliary_gate_supervision_weight,
+        )
+    ):
+        raise ValueError("Auxiliary losses require auxiliary features")
+    if auxiliary_gate_supervision_weight > 0.0 and auxiliary_fusion != "gated_residual":
+        raise ValueError("Gate supervision requires gated_residual fusion")
     if consistency_view_weights is None or objective == "car_only":
         # The car_only control trains on a single view and applies no
         # consistency term, so any globally configured multi-view weights are
@@ -292,8 +356,16 @@ def fit_reve_set_probe(
                 # then learns only when the data support an auxiliary update.
                 nn.init.zeros_(self.auxiliary_linear.weight)
                 nn.init.zeros_(self.auxiliary_linear.bias)
+                if auxiliary_fusion == "gated_residual":
+                    gate_features = auxiliary_queries * embed_dim + n_classes
+                    self.auxiliary_gate = nn.Linear(gate_features, 1)
+                    nn.init.zeros_(self.auxiliary_gate.weight)
+                    initial_logit = math.log(
+                        auxiliary_gate_initial_probability / (1.0 - auxiliary_gate_initial_probability)
+                    )
+                    nn.init.constant_(self.auxiliary_gate.bias, initial_logit)
 
-        def forward(self, tokens, auxiliary=None):
+        def forward(self, tokens, auxiliary=None, *, return_components=False):
             queries = self.queries.unsqueeze(0).expand(tokens.shape[0], -1, -1)
             # Request explicit weights to avoid fused SDPA kernels whose exact
             # deterministic behavior varies across PyTorch/CUDA releases.
@@ -304,6 +376,8 @@ def fit_reve_set_probe(
             if not self.uses_auxiliary:
                 if auxiliary is not None:
                     raise ValueError("This REVE set head was fitted without auxiliary tokens")
+                if return_components:
+                    raise ValueError("Auxiliary components require an auxiliary branch")
                 return logits
             if auxiliary is None:
                 raise ValueError("This REVE set head requires auxiliary tokens")
@@ -317,7 +391,18 @@ def fit_reve_set_probe(
                 need_weights=True,
             )
             auxiliary_context = self.auxiliary_norm(auxiliary_queries_batch + auxiliary_context)
-            return logits + self.auxiliary_linear(self.dropout(auxiliary_context.flatten(1)))
+            auxiliary_flat = self.dropout(auxiliary_context.flatten(1))
+            residual = self.auxiliary_linear(auxiliary_flat)
+            if auxiliary_fusion == "gated_residual":
+                gate_input = torch.cat([auxiliary_flat, logits.detach()], dim=-1)
+                gate = torch.sigmoid(self.auxiliary_gate(gate_input))
+            else:
+                gate = torch.ones((tokens.shape[0], 1), dtype=logits.dtype, device=logits.device)
+            applied_residual = gate * residual
+            final = logits + applied_residual
+            if return_components:
+                return final, logits, applied_residual, gate
+            return final
 
     model = ReveSetHead().to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
@@ -345,6 +430,11 @@ def fit_reve_set_probe(
     best_epoch = 0
     best_consistency = float("nan")
     best_disagreement = float("nan")
+    best_auxiliary_preservation = float("nan")
+    best_auxiliary_consistency = float("nan")
+    best_gate_target = float("nan")
+    best_gate_nontarget = float("nan")
+    best_gate_supervision = float("nan")
     best_state = None
     stale_epochs = 0
     history: list[dict[str, float]] = []
@@ -354,6 +444,9 @@ def fit_reve_set_probe(
         total_loss = 0.0
         epoch_ce = 0.0
         epoch_consistency = 0.0
+        epoch_auxiliary_preservation = 0.0
+        epoch_auxiliary_residual_consistency = 0.0
+        epoch_auxiliary_gate_supervision = 0.0
         for indices, labels in train_loader:
             labels = labels.to(device, dtype=torch.long, non_blocking=True)
             if global_step < total_warmup_steps:
@@ -361,20 +454,28 @@ def fit_reve_set_probe(
                 for group in optimizer.param_groups:
                     group["lr"] = learning_rate * max(ratio, 1e-3)
             optimizer.zero_grad(set_to_none=True)
-            logits = torch.stack(
-                [
-                    model(
-                        tokens[indices].to(device, dtype=torch.float32, non_blocking=True),
-                        None
-                        if not use_auxiliary
-                        else train_auxiliary_tensors[view_index][indices].to(
-                            device, dtype=torch.float32, non_blocking=True
-                        ),
-                    )
-                    for view_index, tokens in enumerate(train_view_tensors)
-                ],
-                dim=1,
-            )
+            model_outputs = [
+                model(
+                    tokens[indices].to(device, dtype=torch.float32, non_blocking=True),
+                    None
+                    if not use_auxiliary
+                    else train_auxiliary_tensors[view_index][indices].to(
+                        device, dtype=torch.float32, non_blocking=True
+                    ),
+                    return_components=use_auxiliary,
+                )
+                for view_index, tokens in enumerate(train_view_tensors)
+            ]
+            if use_auxiliary:
+                logits = torch.stack([output[0] for output in model_outputs], dim=1)
+                base_logits = torch.stack([output[1] for output in model_outputs], dim=1)
+                applied_residuals = torch.stack([output[2] for output in model_outputs], dim=1)
+                auxiliary_gates = torch.stack([output[3] for output in model_outputs], dim=1)
+            else:
+                logits = torch.stack(model_outputs, dim=1)
+                base_logits = None
+                applied_residuals = None
+                auxiliary_gates = None
             if objective == "car_only":
                 ce_loss = criterion(logits[:, 0], labels)
             else:
@@ -406,13 +507,59 @@ def fit_reve_set_probe(
                     )
                     active_weights.append(float(view_weight))
                 consistency_loss = torch.stack(weighted_terms).sum() / sum(active_weights)
-            loss = ce_loss + consistency_weight * consistency_loss
+
+            auxiliary_preservation_loss = logits.new_zeros(())
+            auxiliary_residual_consistency_loss = logits.new_zeros(())
+            auxiliary_gate_supervision_loss = logits.new_zeros(())
+            target_mask = torch.zeros_like(labels, dtype=torch.bool)
+            for class_index in target_classes:
+                target_mask |= labels.eq(class_index)
+            if use_auxiliary and auxiliary_preservation_weight > 0.0:
+                preserve_mask = ~target_mask
+                if torch.any(preserve_mask):
+                    # The safeguard may update only the auxiliary correction;
+                    # ordinary CE remains responsible for the REVE base head.
+                    teacher_probability = torch.softmax(base_logits.detach(), dim=-1)
+                    preservation_logits = base_logits.detach() + applied_residuals
+                    student_log_probability = torch.log_softmax(preservation_logits, dim=-1)
+                    per_view_kl = (
+                        teacher_probability
+                        * (torch.log(teacher_probability.clamp_min(1e-8)) - student_log_probability)
+                    ).sum(dim=-1)
+                    auxiliary_preservation_loss = per_view_kl[preserve_mask].mean()
+            if (
+                use_auxiliary
+                and auxiliary_residual_consistency_weight > 0.0
+                and applied_residuals.shape[1] > 1
+            ):
+                auxiliary_residual_consistency_loss = (
+                    (applied_residuals[:, 1:] - applied_residuals[:, :1]).pow(2).mean()
+                )
+            if use_auxiliary and auxiliary_gate_supervision_weight > 0.0:
+                gate_target = target_mask[:, None, None].expand_as(auxiliary_gates)
+                auxiliary_gate_supervision_loss = torch.nn.functional.binary_cross_entropy(
+                    auxiliary_gates, gate_target.to(dtype=auxiliary_gates.dtype)
+                )
+            loss = (
+                ce_loss
+                + consistency_weight * consistency_loss
+                + auxiliary_preservation_weight * auxiliary_preservation_loss
+                + auxiliary_residual_consistency_weight * auxiliary_residual_consistency_loss
+                + auxiliary_gate_supervision_weight * auxiliary_gate_supervision_loss
+            )
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=clip_grad)
             optimizer.step()
             total_loss += float(loss.item()) * labels.shape[0]
             epoch_ce += float(ce_loss.item()) * labels.shape[0]
             epoch_consistency += float(consistency_loss.item()) * labels.shape[0]
+            epoch_auxiliary_preservation += float(auxiliary_preservation_loss.item()) * labels.shape[0]
+            epoch_auxiliary_residual_consistency += (
+                float(auxiliary_residual_consistency_loss.item()) * labels.shape[0]
+            )
+            epoch_auxiliary_gate_supervision += (
+                float(auxiliary_gate_supervision_loss.item()) * labels.shape[0]
+            )
             global_step += 1
 
         validation_probabilities = np.stack(
@@ -463,6 +610,59 @@ def fit_reve_set_probe(
                 )
             )
         )
+        validation_auxiliary_preservation = 0.0
+        validation_auxiliary_consistency = 0.0
+        validation_gate_target = float("nan")
+        validation_gate_nontarget = float("nan")
+        validation_gate_supervision = 0.0
+        if use_auxiliary:
+            components = [
+                predictor.predict_auxiliary_components((view, val_aux_views[view_index]))
+                for view_index, view in enumerate(val_views)
+            ]
+            final_logits = np.stack([item["final"] for item in components], axis=1)
+            base_logits_numpy = np.stack([item["base"] for item in components], axis=1)
+            residuals_numpy = np.stack([item["residual"] for item in components], axis=1)
+            gates_numpy = np.stack([item["gate"] for item in components], axis=1)
+            target_mask_numpy = np.isin(val_y, target_classes)
+            preserve_mask_numpy = ~target_mask_numpy
+            if np.any(preserve_mask_numpy):
+                teacher = base_logits_numpy - base_logits_numpy.max(axis=-1, keepdims=True)
+                teacher = np.exp(teacher)
+                teacher /= teacher.sum(axis=-1, keepdims=True)
+                student = final_logits - final_logits.max(axis=-1, keepdims=True)
+                student = np.exp(student)
+                student /= student.sum(axis=-1, keepdims=True)
+                validation_auxiliary_preservation = float(
+                    np.mean(
+                        np.sum(
+                            teacher[preserve_mask_numpy]
+                            * (
+                                np.log(np.clip(teacher[preserve_mask_numpy], 1e-8, 1.0))
+                                - np.log(np.clip(student[preserve_mask_numpy], 1e-8, 1.0))
+                            ),
+                            axis=-1,
+                        )
+                    )
+                )
+            if residuals_numpy.shape[1] > 1:
+                validation_auxiliary_consistency = float(
+                    np.mean((residuals_numpy[:, 1:] - residuals_numpy[:, :1]) ** 2)
+                )
+            if np.any(target_mask_numpy):
+                validation_gate_target = float(np.mean(gates_numpy[target_mask_numpy]))
+            if np.any(preserve_mask_numpy):
+                validation_gate_nontarget = float(np.mean(gates_numpy[preserve_mask_numpy]))
+            gate_targets_numpy = np.broadcast_to(target_mask_numpy[:, None, None], gates_numpy.shape).astype(
+                np.float64
+            )
+            clipped_gates = np.clip(gates_numpy.astype(np.float64), 1e-8, 1.0 - 1e-8)
+            validation_gate_supervision = float(
+                -np.mean(
+                    gate_targets_numpy * np.log(clipped_gates)
+                    + (1.0 - gate_targets_numpy) * np.log(1.0 - clipped_gates)
+                )
+            )
         clean_score = validation_scores[0]
         score = float(np.mean(validation_scores))
         if epoch > warmup_epochs:
@@ -474,6 +674,18 @@ def fit_reve_set_probe(
                 "train_loss": float(epoch_loss),
                 "train_ce_loss": float(epoch_ce / train_y.size),
                 "train_consistency_loss": float(epoch_consistency / train_y.size),
+                "train_auxiliary_preservation_loss": float(epoch_auxiliary_preservation / train_y.size),
+                "train_auxiliary_residual_consistency_loss": float(
+                    epoch_auxiliary_residual_consistency / train_y.size
+                ),
+                "train_auxiliary_gate_supervision_loss": float(
+                    epoch_auxiliary_gate_supervision / train_y.size
+                ),
+                "validation_auxiliary_preservation_loss": validation_auxiliary_preservation,
+                "validation_auxiliary_consistency_loss": validation_auxiliary_consistency,
+                "validation_auxiliary_gate_target_mean": validation_gate_target,
+                "validation_auxiliary_gate_nontarget_mean": validation_gate_nontarget,
+                "validation_auxiliary_gate_supervision_loss": validation_gate_supervision,
                 "validation_car_balanced_accuracy": clean_score,
                 "validation_balanced_accuracy": score,
                 "validation_consistency_loss": validation_consistency,
@@ -491,6 +703,11 @@ def fit_reve_set_probe(
             best_epoch = epoch
             best_consistency = validation_consistency
             best_disagreement = validation_disagreement
+            best_auxiliary_preservation = validation_auxiliary_preservation
+            best_auxiliary_consistency = validation_auxiliary_consistency
+            best_gate_target = validation_gate_target
+            best_gate_nontarget = validation_gate_nontarget
+            best_gate_supervision = validation_gate_supervision
             best_state = deepcopy(model.state_dict())
             stale_epochs = 0
         else:
@@ -521,4 +738,9 @@ def fit_reve_set_probe(
         tuple(history),
         trainable_parameters,
         auxiliary_parameters,
+        best_auxiliary_preservation,
+        best_auxiliary_consistency,
+        best_gate_target,
+        best_gate_nontarget,
+        best_gate_supervision,
     )

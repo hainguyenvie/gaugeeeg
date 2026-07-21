@@ -860,3 +860,25 @@ The runner evaluates a raw spectral capacity control, odd-only ablation, and
 the complete odd+even GQBA over seeds 7/21/42. See
 [docs/GQBA_SCREEN.md](docs/GQBA_SCREEN.md) for the fixed representation,
 matched-parameter checks, advancement gates, and result files to return.
+
+## Gauge-Selective Residual Adapter screen
+
+The direct GQBA residual increased `both_fists` recall but did not improve
+native16 balanced accuracy because it traded away unilateral recall. The next
+locked screen therefore tests GSRA: a confidence-gated invariant residual with
+unilateral distribution preservation, cross-view residual consistency, and a
+supervised bilateral rule-applicability gate. It includes matched gated
+spectral and gated-GQBA controls so capacity, gating, representation, and
+objective effects remain identifiable:
+
+```bash
+git pull
+source .venv/bin/activate
+make test
+DEVICE=cuda make gsra-screen
+```
+
+The script restores compressed Phase-A/GQBA control predictions automatically
+and runs three new arms over seeds 7/21/42. See
+[docs/GSRA_SCREEN.md](docs/GSRA_SCREEN.md) for the frozen hypothesis, loss,
+controls, advancement gates, and result files to return.

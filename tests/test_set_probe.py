@@ -123,6 +123,59 @@ class ReveSetProbeTests(unittest.TestCase):
         self.assertGreater(result.auxiliary_parameters, 0)
         self.assertGreater(result.trainable_parameters, result.auxiliary_parameters)
 
+    def test_gated_auxiliary_reports_selective_residual_diagnostics(self):
+        from gaugeeeg.set_probe import fit_reve_set_probe
+
+        rng = np.random.default_rng(23)
+        labels = np.tile(np.arange(4), 16)
+        full = rng.normal(scale=0.2, size=(64, 6, 8)).astype(np.float32)
+        sparse = full[:, :4].copy()
+        auxiliary = rng.normal(scale=0.2, size=(64, 6, 9)).astype(np.float32)
+        for trial, label in enumerate(labels):
+            full[trial, 0, label] += 2.0
+            sparse[trial, 0, label] += 2.0
+            if label == 2:
+                auxiliary[trial, 0, 0] += 3.0
+        result = fit_reve_set_probe(
+            (full[:48], sparse[:48]),
+            labels[:48],
+            (full[48:], sparse[48:]),
+            labels[48:],
+            initial_query=np.zeros(8, dtype=np.float32),
+            n_classes=4,
+            seed=23,
+            device="cpu",
+            n_queries=2,
+            n_heads=2,
+            ff_multiplier=1,
+            batch_size=8,
+            epochs=3,
+            learning_rate=0.02,
+            warmup_epochs=0,
+            patience=3,
+            objective="multi_view_ce",
+            train_auxiliary=(auxiliary[:48], auxiliary[:48]),
+            val_auxiliary=(auxiliary[48:], auxiliary[48:]),
+            auxiliary_queries=1,
+            auxiliary_hidden_dim=8,
+            auxiliary_fusion="gated_residual",
+            auxiliary_preservation_weight=1.0,
+            auxiliary_residual_consistency_weight=0.1,
+            auxiliary_gate_supervision_weight=0.1,
+            auxiliary_target_classes=[2, 3],
+        )
+        diagnostics = result.model.predict_auxiliary_components((full[48:], auxiliary[48:]))
+        self.assertEqual(diagnostics["gate"].shape, (16, 1))
+        self.assertTrue(np.all((diagnostics["gate"] > 0.0) & (diagnostics["gate"] < 1.0)))
+        self.assertTrue(np.isfinite(result.validation_auxiliary_preservation_loss))
+        self.assertTrue(np.isfinite(result.validation_auxiliary_consistency_loss))
+        self.assertTrue(np.isfinite(result.validation_auxiliary_gate_target_mean))
+        self.assertTrue(np.isfinite(result.validation_auxiliary_gate_nontarget_mean))
+        self.assertIn("train_auxiliary_preservation_loss", result.history[0])
+        self.assertIn("train_auxiliary_residual_consistency_loss", result.history[0])
+        self.assertIn("train_auxiliary_gate_supervision_loss", result.history[0])
+        self.assertTrue(np.isfinite(result.validation_auxiliary_gate_supervision_loss))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -85,6 +85,36 @@ def validate_config(config: dict[str, Any]) -> None:
         raise ValueError("auxiliary_queries must be positive")
     if int(experiment.get("auxiliary_hidden_dim", 64)) < 1:
         raise ValueError("auxiliary_hidden_dim must be positive")
+    auxiliary_fusion = str(experiment.get("auxiliary_fusion", "residual")).casefold()
+    if auxiliary_fusion not in {"residual", "gated_residual"}:
+        raise ValueError("auxiliary_fusion must be 'residual' or 'gated_residual'")
+    if probe_auxiliary == "none" and auxiliary_fusion != "residual":
+        raise ValueError("gated_residual requires a probe_auxiliary representation")
+    gate_probability = float(experiment.get("auxiliary_gate_initial_probability", 0.25))
+    if not math.isfinite(gate_probability) or not 0.0 < gate_probability < 1.0:
+        raise ValueError("auxiliary_gate_initial_probability must be finite and in (0, 1)")
+    for key in (
+        "auxiliary_preservation_weight",
+        "auxiliary_residual_consistency_weight",
+        "auxiliary_gate_supervision_weight",
+    ):
+        value = float(experiment.get(key, 0.0))
+        if not math.isfinite(value) or value < 0.0:
+            raise ValueError(f"{key} must be finite and non-negative")
+        if probe_auxiliary == "none" and value > 0.0:
+            raise ValueError(f"{key} requires a probe_auxiliary representation")
+    target_classes = [int(value) for value in experiment.get("auxiliary_target_classes", [2, 3])]
+    if len(set(target_classes)) != len(target_classes) or any(
+        value < 0 or value > 3 for value in target_classes
+    ):
+        raise ValueError("auxiliary_target_classes must be unique four-class indices")
+    if float(experiment.get("auxiliary_preservation_weight", 0.0)) > 0.0 and not target_classes:
+        raise ValueError("Class preservation requires at least one auxiliary_target_class")
+    if float(experiment.get("auxiliary_gate_supervision_weight", 0.0)) > 0.0:
+        if auxiliary_fusion != "gated_residual":
+            raise ValueError("Gate supervision requires auxiliary_fusion: gated_residual")
+        if not target_classes:
+            raise ValueError("Gate supervision requires at least one auxiliary_target_class")
     training_views = [str(view).casefold() for view in experiment.get("training_views", ["car"])]
     if not training_views or training_views[0] != "car":
         raise ValueError("training_views must start with 'car'")
@@ -142,6 +172,12 @@ def with_overrides(
     defenses: list[str] | None = None,
     set_queries: int | None = None,
     probe_auxiliary: str | None = None,
+    auxiliary_fusion: str | None = None,
+    auxiliary_gate_initial_probability: float | None = None,
+    auxiliary_preservation_weight: float | None = None,
+    auxiliary_residual_consistency_weight: float | None = None,
+    auxiliary_gate_supervision_weight: float | None = None,
+    auxiliary_target_classes: list[int] | None = None,
 ) -> dict[str, Any]:
     result = deepcopy(config)
     experiment = result["experiment"]
@@ -171,6 +207,18 @@ def with_overrides(
         experiment["set_queries"] = int(set_queries)
     if probe_auxiliary is not None:
         experiment["probe_auxiliary"] = str(probe_auxiliary)
+    if auxiliary_fusion is not None:
+        experiment["auxiliary_fusion"] = str(auxiliary_fusion)
+    if auxiliary_gate_initial_probability is not None:
+        experiment["auxiliary_gate_initial_probability"] = float(auxiliary_gate_initial_probability)
+    if auxiliary_preservation_weight is not None:
+        experiment["auxiliary_preservation_weight"] = float(auxiliary_preservation_weight)
+    if auxiliary_residual_consistency_weight is not None:
+        experiment["auxiliary_residual_consistency_weight"] = float(auxiliary_residual_consistency_weight)
+    if auxiliary_gate_supervision_weight is not None:
+        experiment["auxiliary_gate_supervision_weight"] = float(auxiliary_gate_supervision_weight)
+    if auxiliary_target_classes is not None:
+        experiment["auxiliary_target_classes"] = [int(value) for value in auxiliary_target_classes]
     validate_config(result)
     return result
 

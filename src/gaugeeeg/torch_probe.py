@@ -19,6 +19,11 @@ class TorchProbeResult:
     history: tuple[dict[str, float], ...]
     trainable_parameters: int = 0
     auxiliary_parameters: int = 0
+    validation_auxiliary_preservation_loss: float = float("nan")
+    validation_auxiliary_consistency_loss: float = float("nan")
+    validation_auxiliary_gate_target_mean: float = float("nan")
+    validation_auxiliary_gate_nontarget_mean: float = float("nan")
+    validation_auxiliary_gate_supervision_loss: float = float("nan")
 
 
 class TorchTokenPredictor:

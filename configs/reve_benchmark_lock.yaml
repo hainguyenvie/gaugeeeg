@@ -35,10 +35,16 @@ experiment:
   set_queries: 4
   set_heads: 8
   set_ff_multiplier: 2
-  # Optional raw-signal branch used only by the matched GQBA screen.
+  # Optional raw-signal branch used by the matched GQBA/GSRA screens.
   probe_auxiliary: none
   auxiliary_queries: 2
   auxiliary_hidden_dim: 64
+  auxiliary_fusion: residual
+  auxiliary_gate_initial_probability: 0.25
+  auxiliary_preservation_weight: 0.0
+  auxiliary_residual_consistency_weight: 0.0
+  auxiliary_gate_supervision_weight: 0.0
+  auxiliary_target_classes: [2, 3]
   probe_batch_size: 32
   probe_epochs: 20
   probe_learning_rate: 0.0001

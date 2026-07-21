@@ -277,6 +277,14 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
     probe_objective = str(experiment.get("probe_objective", "car_only")).casefold()
     probe_auxiliary = str(experiment.get("probe_auxiliary", "none")).casefold()
     use_probe_auxiliary = probe_auxiliary != "none"
+    auxiliary_fusion = str(experiment.get("auxiliary_fusion", "residual")).casefold()
+    auxiliary_gate_initial_probability = float(experiment.get("auxiliary_gate_initial_probability", 0.25))
+    auxiliary_preservation_weight = float(experiment.get("auxiliary_preservation_weight", 0.0))
+    auxiliary_residual_consistency_weight = float(
+        experiment.get("auxiliary_residual_consistency_weight", 0.0)
+    )
+    auxiliary_gate_supervision_weight = float(experiment.get("auxiliary_gate_supervision_weight", 0.0))
+    auxiliary_target_classes = [int(value) for value in experiment.get("auxiliary_target_classes", [2, 3])]
     consistency_weight = float(experiment.get("consistency_weight", 0.0))
     views = [str(view) for view in experiment.get("test_views", ["car"])]
     validation_prediction_views = [str(view) for view in experiment.get("validation_prediction_views", views)]
@@ -406,6 +414,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         validation_prediction_disagreement = float("nan")
         trainable_parameters = 0
         auxiliary_parameters = 0
+        validation_auxiliary_preservation_loss = float("nan")
+        validation_auxiliary_consistency_loss = float("nan")
+        validation_auxiliary_gate_target_mean = float("nan")
+        validation_auxiliary_gate_nontarget_mean = float("nan")
+        validation_auxiliary_gate_supervision_loss = float("nan")
         if probe_name == "sklearn_logreg":
             if len(training_views) != 1:
                 raise ValueError("sklearn_logreg does not support aligned multi-view training")
@@ -484,6 +497,12 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                     val_auxiliary=val_auxiliary,
                     auxiliary_queries=int(experiment.get("auxiliary_queries", 2)),
                     auxiliary_hidden_dim=int(experiment.get("auxiliary_hidden_dim", 64)),
+                    auxiliary_fusion=auxiliary_fusion,
+                    auxiliary_gate_initial_probability=auxiliary_gate_initial_probability,
+                    auxiliary_preservation_weight=auxiliary_preservation_weight,
+                    auxiliary_residual_consistency_weight=(auxiliary_residual_consistency_weight),
+                    auxiliary_gate_supervision_weight=auxiliary_gate_supervision_weight,
+                    auxiliary_target_classes=auxiliary_target_classes,
                     **common_probe_kwargs,
                 )
             predictor = probe.model
@@ -493,6 +512,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             validation_prediction_disagreement = probe.validation_prediction_disagreement
             trainable_parameters = probe.trainable_parameters
             auxiliary_parameters = probe.auxiliary_parameters
+            validation_auxiliary_preservation_loss = probe.validation_auxiliary_preservation_loss
+            validation_auxiliary_consistency_loss = probe.validation_auxiliary_consistency_loss
+            validation_auxiliary_gate_target_mean = probe.validation_auxiliary_gate_target_mean
+            validation_auxiliary_gate_nontarget_mean = probe.validation_auxiliary_gate_nontarget_mean
+            validation_auxiliary_gate_supervision_loss = probe.validation_auxiliary_gate_supervision_loss
             pd.DataFrame(probe.history).to_csv(output_dir / f"probe_history_{defense}.csv", index=False)
 
             if bool(experiment.get("save_probe_checkpoint", True)):
@@ -519,6 +543,12 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                             "probe_auxiliary": probe_auxiliary,
                             "auxiliary_queries": int(experiment.get("auxiliary_queries", 2)),
                             "auxiliary_hidden_dim": int(experiment.get("auxiliary_hidden_dim", 64)),
+                            "auxiliary_fusion": auxiliary_fusion,
+                            "auxiliary_gate_initial_probability": (auxiliary_gate_initial_probability),
+                            "auxiliary_preservation_weight": auxiliary_preservation_weight,
+                            "auxiliary_residual_consistency_weight": (auxiliary_residual_consistency_weight),
+                            "auxiliary_gate_supervision_weight": auxiliary_gate_supervision_weight,
+                            "auxiliary_target_classes": auxiliary_target_classes,
                         },
                         output_dir / f"probe_best_{defense}.pt",
                     )
@@ -721,6 +751,7 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 "probe": probe_name,
                 "probe_objective": probe_objective,
                 "probe_auxiliary": probe_auxiliary,
+                "auxiliary_fusion": auxiliary_fusion,
                 "trainable_parameters": trainable_parameters,
                 "auxiliary_parameters": auxiliary_parameters,
                 "consistency_weight": consistency_weight,
@@ -731,6 +762,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
                 "validation_balanced_accuracy": validation_score,
                 "validation_consistency_loss": validation_consistency_loss,
                 "validation_prediction_disagreement": validation_prediction_disagreement,
+                "validation_auxiliary_preservation_loss": (validation_auxiliary_preservation_loss),
+                "validation_auxiliary_consistency_loss": validation_auxiliary_consistency_loss,
+                "validation_auxiliary_gate_target_mean": validation_auxiliary_gate_target_mean,
+                "validation_auxiliary_gate_nontarget_mean": (validation_auxiliary_gate_nontarget_mean),
+                "validation_auxiliary_gate_supervision_loss": (validation_auxiliary_gate_supervision_loss),
                 **metrics,
                 **drift,
                 "balanced_accuracy_gap_from_car": (
@@ -830,6 +866,12 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             "set_heads": int(experiment.get("set_heads", 0)),
             "auxiliary_queries": int(experiment.get("auxiliary_queries", 2)),
             "auxiliary_hidden_dim": int(experiment.get("auxiliary_hidden_dim", 64)),
+            "auxiliary_fusion": auxiliary_fusion,
+            "auxiliary_gate_initial_probability": auxiliary_gate_initial_probability,
+            "auxiliary_preservation_weight": auxiliary_preservation_weight,
+            "auxiliary_residual_consistency_weight": auxiliary_residual_consistency_weight,
+            "auxiliary_gate_supervision_weight": auxiliary_gate_supervision_weight,
+            "auxiliary_target_classes": auxiliary_target_classes,
             "trainable_parameters": trainable_parameters,
             "auxiliary_parameters": auxiliary_parameters,
             "auxiliary_reference_max_abs_diff": auxiliary_reference_max_abs_diff,
@@ -838,6 +880,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
             "defense_metadata": {defense: channel_adaptation_metadata(defense) for defense in defenses},
             "consistency_weight": consistency_weight,
             "consistency_view_weights": experiment.get("consistency_view_weights"),
+            "validation_auxiliary_preservation_loss": (validation_auxiliary_preservation_loss),
+            "validation_auxiliary_consistency_loss": validation_auxiliary_consistency_loss,
+            "validation_auxiliary_gate_target_mean": validation_auxiliary_gate_target_mean,
+            "validation_auxiliary_gate_nontarget_mean": (validation_auxiliary_gate_nontarget_mean),
+            "validation_auxiliary_gate_supervision_loss": (validation_auxiliary_gate_supervision_loss),
             "validation_prediction_views": validation_prediction_views,
             "validation_predictions_only": True,
             "prediction_split": prediction_split,
@@ -914,6 +961,12 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "probe_objective": probe_objective,
         "probe_auxiliary": probe_auxiliary,
         "probe_auxiliary_metadata": gqba_metadata(probe_auxiliary),
+        "auxiliary_fusion": auxiliary_fusion,
+        "auxiliary_gate_initial_probability": auxiliary_gate_initial_probability,
+        "auxiliary_preservation_weight": auxiliary_preservation_weight,
+        "auxiliary_residual_consistency_weight": auxiliary_residual_consistency_weight,
+        "auxiliary_gate_supervision_weight": auxiliary_gate_supervision_weight,
+        "auxiliary_target_classes": auxiliary_target_classes,
         "trainable_parameters": trainable_parameters,
         "auxiliary_parameters": auxiliary_parameters,
         "auxiliary_reference_max_abs_diff": auxiliary_reference_max_abs_diff,
@@ -926,6 +979,11 @@ def run_experiment(config: dict[str, Any]) -> pd.DataFrame:
         "validation_balanced_accuracy": validation_score,
         "validation_consistency_loss": validation_consistency_loss,
         "validation_prediction_disagreement": validation_prediction_disagreement,
+        "validation_auxiliary_preservation_loss": validation_auxiliary_preservation_loss,
+        "validation_auxiliary_consistency_loss": validation_auxiliary_consistency_loss,
+        "validation_auxiliary_gate_target_mean": validation_auxiliary_gate_target_mean,
+        "validation_auxiliary_gate_nontarget_mean": validation_auxiliary_gate_nontarget_mean,
+        "validation_auxiliary_gate_supervision_loss": validation_auxiliary_gate_supervision_loss,
         "n_trials": int(dataset.y.size),
         "n_channels": len(dataset.channel_names),
         "sfreq": dataset.sfreq,
