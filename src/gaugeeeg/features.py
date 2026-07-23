@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
@@ -76,6 +78,7 @@ class FrozenREVEEncoder:
         input_scale_uv: float = 100.0,
         model_revision: str | None = None,
         position_model_revision: str | None = None,
+        adapter_checkpoint: str | None = None,
     ) -> None:
         try:
             import torch
@@ -112,6 +115,21 @@ class FrozenREVEEncoder:
             ) from exc
         self.position_bank.to(self.device).eval()
         self.model.to(self.device).eval()
+        adapter_metadata = None
+        adapter_sha256 = None
+        if adapter_checkpoint:
+            from .mojepa import load_mojepa_adapter
+
+            adapter_path = Path(adapter_checkpoint)
+            if not adapter_path.is_file():
+                raise FileNotFoundError(f"REVE adapter checkpoint does not exist: {adapter_path}")
+            adapter_metadata = load_mojepa_adapter(
+                self.model,
+                adapter_path,
+                map_location=self.device,
+            )
+            adapter_sha256 = hashlib.sha256(adapter_path.read_bytes()).hexdigest()
+            self.model.eval()
         resolved_model_revision = str(
             getattr(self.model.config, "_commit_hash", None) or model_revision or "unresolved"
         )
@@ -128,12 +146,17 @@ class FrozenREVEEncoder:
             "position_model_revision": resolved_position_revision,
             "pooling": pooling,
             "input_scale_uv": self.input_scale_uv,
+            "adapter_checkpoint": str(adapter_checkpoint) if adapter_checkpoint else None,
+            "adapter_sha256": adapter_sha256,
+            "adapter_method": None if adapter_metadata is None else adapter_metadata.get("method"),
         }
         self.cache_signature = (
             f"reve:{model_name}@{resolved_model_revision}:"
             f"positions={position_model_name}@{resolved_position_revision}:"
             f"pool={pooling}:scale={self.input_scale_uv:g}:v3"
         )
+        if adapter_sha256 is not None:
+            self.cache_signature += f":adapter={adapter_sha256}"
 
     @property
     def pretrained_query(self) -> NDArray[np.float32]:
@@ -208,5 +231,6 @@ def build_encoder(experiment_config: dict) -> Encoder:
             input_scale_uv=float(experiment_config.get("reve_input_scale_uv", 100.0)),
             model_revision=experiment_config.get("model_revision"),
             position_model_revision=experiment_config.get("position_model_revision"),
+            adapter_checkpoint=experiment_config.get("adapter_checkpoint"),
         )
     raise ValueError(f"Unknown encoder: {encoder_name}")
