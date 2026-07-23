@@ -205,6 +205,7 @@ def with_overrides(
     representation_contrastive_weight: float | None = None,
     representation_bilaterality_weight: float | None = None,
     representation_temperature: float | None = None,
+    adapter_checkpoint: str | None = None,
 ) -> dict[str, Any]:
     result = deepcopy(config)
     experiment = result["experiment"]
@@ -252,6 +253,8 @@ def with_overrides(
         experiment["representation_bilaterality_weight"] = float(representation_bilaterality_weight)
     if representation_temperature is not None:
         experiment["representation_temperature"] = float(representation_temperature)
+    if adapter_checkpoint is not None:
+        experiment["adapter_checkpoint"] = str(adapter_checkpoint)
     validate_config(result)
     return result
 

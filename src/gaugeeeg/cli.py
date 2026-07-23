@@ -40,8 +40,23 @@ def _run_command(args: argparse.Namespace) -> None:
         representation_contrastive_weight=args.representation_contrastive_weight,
         representation_bilaterality_weight=args.representation_bilaterality_weight,
         representation_temperature=args.representation_temperature,
+        adapter_checkpoint=args.adapter_checkpoint,
     )
     run_experiment(config)
+
+
+def _adapt_mojepa_command(args: argparse.Namespace) -> None:
+    from .mojepa import run_mojepa_adaptation
+
+    config = load_config(args.config)
+    summary = run_mojepa_adaptation(
+        config,
+        objective=args.objective,
+        device=args.device,
+        seed=args.seed,
+        output_dir=args.output_dir,
+    )
+    print(json.dumps(summary, indent=2, sort_keys=True))
 
 
 def _download_command(args: argparse.Namespace) -> None:
@@ -566,7 +581,25 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--representation-contrastive-weight", type=float)
     run.add_argument("--representation-bilaterality-weight", type=float)
     run.add_argument("--representation-temperature", type=float)
+    run.add_argument(
+        "--adapter-checkpoint",
+        help="Gauge-MOJEPA/LoRA checkpoint to load before feature extraction",
+    )
     run.set_defaults(handler=_run_command)
+
+    adapt_mojepa = subparsers.add_parser(
+        "adapt-mojepa",
+        help="Adapt REVE attention with a matched LoRA control or Gauge-MOJEPA",
+    )
+    adapt_mojepa.add_argument("--config", required=True)
+    adapt_mojepa.add_argument(
+        "--objective",
+        choices=["lora_multiview_ce", "lora_generic_jepa", "gauge_mojepa"],
+    )
+    adapt_mojepa.add_argument("--device", help="auto, cpu, cuda, or cuda:N")
+    adapt_mojepa.add_argument("--seed", type=int)
+    adapt_mojepa.add_argument("--output-dir")
+    adapt_mojepa.set_defaults(handler=_adapt_mojepa_command)
 
     download = subparsers.add_parser("download", help="Download and cache the configured dataset")
     download.add_argument("--config", required=True)

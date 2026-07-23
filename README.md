@@ -882,3 +882,24 @@ The script restores compressed Phase-A/GQBA control predictions automatically
 and runs three new arms over seeds 7/21/42. See
 [docs/GSRA_SCREEN.md](docs/GSRA_SCREEN.md) for the frozen hypothesis, loss,
 controls, advancement gates, and result files to return.
+
+## Gauge-MOJEPA foundation-model adaptation PoC
+
+All earlier custom screens kept REVE frozen. The new Stage-0 PoC tests the
+remaining setup hypothesis directly: adapt the final four REVE attention blocks
+with rank-8 LoRA, discard the training-only head, and evaluate the resulting
+representation with the locked q4 set-probe protocol. It includes supervised
+LoRA and generic-JEPA controls, so an ordinary benefit from unfreezing cannot be
+misreported as a measurement-operator contribution.
+
+```bash
+git pull
+source .venv/bin/activate
+pip install -e ".[data,reve,dev]"
+make test
+DEVICE=cuda SEEDS="7" make gauge-mojepa-poc
+```
+
+The default is a bounded engineering screen, not a paper run. See
+[docs/GAUGE_MOJEPA_POC.md](docs/GAUGE_MOJEPA_POC.md) for the objective, matched
+arms, full-run transition, leakage lock and advancement rule.
